@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import datetime
 from typing import AsyncGenerator, Generator
 from unittest.mock import patch
@@ -7,6 +8,16 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+# ————————————————————————————————————————————————————————————————
+# Configure test environment BEFORE any app imports that use settings
+# ————————————————————————————————————————————————————————————————
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["DATABASE_SYNC_URL"] = "sqlite:///:memory:"
+os.environ["DATABASE_POOL_SIZE"] = "5"
+os.environ["DATABASE_MAX_OVERFLOW"] = "10"
+os.environ["DEBUG"] = "false"
 
 from app.db.base import Base
 from app.db.models import User, Batch, Prediction, AuditLog
