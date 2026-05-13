@@ -21,24 +21,29 @@ def upgrade() -> None:
     # Create users table
     op.create_table(
         "users",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("email", sa.String(255), nullable=False, unique=True, index=True),
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("email", sa.String(320), nullable=False, unique=True, index=True),
         sa.Column("hashed_password", sa.String(255), nullable=False),
+        sa.Column("is_active", sa.Boolean, nullable=False, server_default=sa.text("false")),
+        sa.Column("is_superuser", sa.Boolean, nullable=False, server_default=sa.text("false")),
+        sa.Column("is_verified", sa.Boolean, nullable=False, server_default=sa.text("false")),
         sa.Column("role", sa.Enum("admin", "reviewer", "auditor", name="role"), nullable=False, index=True),
-        sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.text("now()")),
+        sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
     )
-    op.create_index("ix_users_email", "users", ["email"])
-    op.create_index("ix_users_role", "users", ["role"])
+    # Indices for columns without inline index=True
+    # (email, role have index=True inline; created_at needs explicit index)
+    op.create_index("ix_users_created_at", "users", ["created_at"])
 
     # Create batches table
     op.create_table(
         "batches",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
         sa.Column("state", sa.Enum("pending", "processing", "complete", "failed", name="batchstatus"), nullable=False, index=True),
-        sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime, nullable=False, server_default=sa.text("now()"), onupdate=sa.text("now()")),
+        sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+        sa.Column("updated_at", sa.DateTime, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP"), onupdate=sa.text("CURRENT_TIMESTAMP")),
     )
-    op.create_index("ix_batches_state", "batches", ["state"])
+    # Indices for columns without inline index=True
+    # (state has index=True inline; created_at needs explicit index)
     op.create_index("ix_batches_created_at", "batches", ["created_at"])
 
     # Create predictions table
@@ -49,10 +54,10 @@ def upgrade() -> None:
         sa.Column("label", sa.String(100), nullable=False, index=True),
         sa.Column("confidence", sa.Float, nullable=False),
         sa.Column("overlay_path", sa.String(500), nullable=False),
-        sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.text("now()")),
+        sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
     )
-    op.create_index("ix_predictions_batch_id", "predictions", ["batch_id"])
-    op.create_index("ix_predictions_label", "predictions", ["label"])
+    # Indices for columns without inline index=True
+    # (batch_id, label have index=True inline)
     op.create_index("ix_predictions_confidence", "predictions", ["confidence"])
     op.create_index("ix_predictions_created_at", "predictions", ["created_at"])
     op.create_index("ix_predictions_batch_created", "predictions", ["batch_id", "created_at"])
@@ -61,15 +66,17 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
-        sa.Column("actor_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=False, index=True),
+        sa.Column("actor_id", sa.Integer, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=False, index=True),
         sa.Column("action", sa.String(100), nullable=False, index=True),
-        sa.Column("target", sa.String(500), nullable=False),
-        sa.Column("timestamp", sa.DateTime, nullable=False, server_default=sa.text("now()"), index=True),
+        sa.Column("target_type", sa.String(50), nullable=False),
+        sa.Column("target_id", sa.Integer, nullable=False),
+        sa.Column("timestamp", sa.DateTime, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP"), index=True),
     )
-    op.create_index("ix_audit_logs_actor_id", "audit_logs", ["actor_id"])
-    op.create_index("ix_audit_logs_action", "audit_logs", ["action"])
-    op.create_index("ix_audit_logs_timestamp", "audit_logs", ["timestamp"])
+    # Indices for columns without inline index=True
+    # (actor_id, action, timestamp have index=True inline)
+    # Explicit composite indices:
     op.create_index("ix_audit_logs_actor_timestamp", "audit_logs", ["actor_id", "timestamp"])
+    op.create_index("ix_audit_logs_target", "audit_logs", ["target_type", "target_id"])
 
 
 def downgrade() -> None:
