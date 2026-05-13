@@ -1,1 +1,18 @@
-﻿{ "_owner": "HAWRAA" }
+[
+    "letter",
+    "form",
+    "email",
+    "handwritten",
+    "advertisement",
+    "scientific_report",
+    "scientific_publication",
+    "specification",
+    "file_folder",
+    "news_article",
+    "budget",
+    "invoice",
+    "presentation",
+    "questionnaire",
+    "resume",
+    "memo"
+]
