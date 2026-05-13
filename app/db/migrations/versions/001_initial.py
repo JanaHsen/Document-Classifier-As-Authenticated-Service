@@ -21,7 +21,7 @@ def upgrade() -> None:
     # Create users table
     op.create_table(
         "users",
-        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("email", sa.String(255), nullable=False, unique=True, index=True),
         sa.Column("hashed_password", sa.String(255), nullable=False),
         sa.Column("role", sa.Enum("admin", "reviewer", "auditor", name="role"), nullable=False, index=True),
@@ -61,7 +61,7 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
-        sa.Column("actor_id", sa.Integer, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=False, index=True),
+        sa.Column("actor_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=False, index=True),
         sa.Column("action", sa.String(100), nullable=False, index=True),
         sa.Column("target", sa.String(500), nullable=False),
         sa.Column("timestamp", sa.DateTime, nullable=False, server_default=sa.text("now()"), index=True),

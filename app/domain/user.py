@@ -2,9 +2,9 @@
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
-from pydantic.types import PositiveInt
 
 from app.core.constants import Role
 
@@ -31,7 +31,7 @@ class UserUpdate(BaseModel):
 class UserOut(UserBase):
     """Schema for user output (response)."""
 
-    id: PositiveInt = Field(..., description="User ID")
+    id: UUID = Field(..., description="User ID")
     created_at: datetime = Field(..., description="Account creation timestamp")
 
     model_config = ConfigDict(from_attributes=True)
@@ -40,7 +40,7 @@ class UserOut(UserBase):
 class UserInDB(BaseModel):
     """Schema for user as stored in database (includes hashed password)."""
 
-    id: int
+    id: UUID
     email: EmailStr
     hashed_password: str
     role: Role

@@ -1,17 +1,47 @@
 ﻿from datetime import datetime
 from typing import Optional
+from uuid import UUID as PyUUID, uuid4
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Index, Enum as SQLEnum
 from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator, CHAR
 
 from .base import Base
 from app.core.constants import BatchStatus, Role
 
 
+class UUIDType(TypeDecorator):
+    """Platform-independent UUID type.
+
+    Stores UUIDs as CHAR(36) strings (with hyphens) in the database.
+    Works with SQLite (tests) and PostgreSQL (production).
+    """
+
+    impl = CHAR(36)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        """Convert Python UUID to string for database storage."""
+        if value is None:
+            return None
+        if isinstance(value, PyUUID):
+            return str(value)
+        # Accept string representation as well
+        return str(PyUUID(value))
+
+    def process_result_value(self, value, dialect):
+        """Convert database string back to Python UUID."""
+        if value is None:
+            return None
+        return PyUUID(value)
+
+
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[PyUUID] = mapped_column(
+        UUIDType, primary_key=True, default=uuid4, nullable=False
+    )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[Role] = mapped_column(SQLEnum(Role), nullable=False)
@@ -52,7 +82,7 @@ class Prediction(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     batch_id: Mapped[int] = mapped_column(Integer, ForeignKey("batches.id", ondelete="CASCADE"), nullable=False)
-    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    label: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     overlay_path: Mapped[str] = mapped_column(String(500), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
@@ -61,7 +91,6 @@ class Prediction(Base):
 
     __table_args__ = (
         Index("ix_predictions_batch_id", "batch_id"),
-        Index("ix_predictions_label", "label"),
         Index("ix_predictions_confidence", "confidence"),
         Index("ix_predictions_created_at", "created_at"),
         Index("ix_predictions_batch_created", "batch_id", "created_at"),
@@ -72,7 +101,9 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    actor_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False)
+    actor_id: Mapped[PyUUID] = mapped_column(
+        UUIDType, ForeignKey("users.id", ondelete="SET NULL"), nullable=False
+    )
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     target: Mapped[str] = mapped_column(String(500), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
