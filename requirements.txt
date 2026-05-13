@@ -1,1 +1,43 @@
-﻿# Owner: ALL
+# Owner: ALL
+
+# ── API ────────────────────────────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+python-multipart
+
+# ── Auth (Jana) ────────────────────────────────────────────────────────────────
+fastapi-users[sqlalchemy]
+casbin
+sqlalchemy-casbin
+
+# ── Cache (Tarek) ──────────────────────────────────────────────────────────────
+fastapi-cache2[redis]
+
+# ── Database (Tarek) ───────────────────────────────────────────────────────────
+sqlalchemy>=2.0
+alembic
+asyncpg
+psycopg2-binary
+
+# ── Queue and Infra (Hadi) ─────────────────────────────────────────────────────
+rq
+redis
+minio
+hvac
+
+# ── Classifier and Inference (Hawraa) ──────────────────────────────────────────
+torch>=2.4
+torchvision>=0.19
+Pillow
+pydantic>=2
+
+# ── Shared ─────────────────────────────────────────────────────────────────────
+python-dotenv
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+pytest
+pytest-asyncio
+httpx
+
+# ── Training only (Colab/Lightning.ai — not used in docker-compose stack) ──────
+# datasets<3.0.0
