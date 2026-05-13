@@ -1,59 +1,35 @@
 ﻿from datetime import datetime
-from typing import Optional
-from uuid import UUID as PyUUID, uuid4
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Index, Enum as SQLEnum
-from sqlalchemy.orm import relationship, Mapped, mapped_column
-from sqlalchemy.types import TypeDecorator, CHAR
+from sqlalchemy import Integer, String, Float, DateTime, ForeignKey, Index, Enum as SQLEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 from app.core.constants import BatchStatus, Role
+from fastapi_users.db import SQLAlchemyBaseUserTable
 
 
-class UUIDType(TypeDecorator):
-    """Platform-independent UUID type.
+class User(SQLAlchemyBaseUserTable[int], Base):
+    """User ORM model with fastapi-users authentication fields."""
 
-    Stores UUIDs as CHAR(36) strings (with hyphens) in the database.
-    Works with SQLite (tests) and PostgreSQL (production).
-    """
-
-    impl = CHAR(36)
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        """Convert Python UUID to string for database storage."""
-        if value is None:
-            return None
-        if isinstance(value, PyUUID):
-            return str(value)
-        # Accept string representation as well
-        return str(PyUUID(value))
-
-    def process_result_value(self, value, dialect):
-        """Convert database string back to Python UUID."""
-        if value is None:
-            return None
-        return PyUUID(value)
-
-
-class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[PyUUID] = mapped_column(
-        UUIDType, primary_key=True, default=uuid4, nullable=False
-    )
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[Role] = mapped_column(SQLEnum(Role), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    # Primary key (required, not provided by mixin at runtime)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
+    # Custom fields
+    role: Mapped[Role] = mapped_column(SQLEnum(Role), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Relationships
     audit_logs: Mapped[list["AuditLog"]] = relationship(
         "AuditLog", back_populates="actor", foreign_keys="AuditLog.actor_id"
     )
 
     __table_args__ = (
-        Index("ix_users_email", "email"),
         Index("ix_users_role", "role"),
+        Index("ix_users_created_at", "created_at"),
     )
 
 
@@ -62,9 +38,14 @@ class Batch(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     state: Mapped[BatchStatus] = mapped_column(SQLEnum(BatchStatus), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
     )
 
     predictions: Mapped[list["Prediction"]] = relationship(
@@ -81,11 +62,15 @@ class Prediction(Base):
     __tablename__ = "predictions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    batch_id: Mapped[int] = mapped_column(Integer, ForeignKey("batches.id", ondelete="CASCADE"), nullable=False)
+    batch_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("batches.id", ondelete="CASCADE"), nullable=False
+    )
     label: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     overlay_path: Mapped[str] = mapped_column(String(500), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
 
     batch: Mapped["Batch"] = relationship("Batch", back_populates="predictions")
 
@@ -98,21 +83,29 @@ class Prediction(Base):
 
 
 class AuditLog(Base):
+    """Audit log for tracking user actions on entities."""
+
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    actor_id: Mapped[PyUUID] = mapped_column(
-        UUIDType, ForeignKey("users.id", ondelete="SET NULL"), nullable=False
+    actor_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False
     )
     action: Mapped[str] = mapped_column(String(100), nullable=False)
-    target: Mapped[str] = mapped_column(String(500), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    target_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
 
-    actor: Mapped["User"] = relationship("User", back_populates="audit_logs", foreign_keys=[actor_id])
+    actor: Mapped["User"] = relationship(
+        "User", back_populates="audit_logs", foreign_keys=[actor_id]
+    )
 
     __table_args__ = (
         Index("ix_audit_logs_actor_id", "actor_id"),
         Index("ix_audit_logs_action", "action"),
         Index("ix_audit_logs_timestamp", "timestamp"),
         Index("ix_audit_logs_actor_timestamp", "actor_id", "timestamp"),
+        Index("ix_audit_logs_target", "target_type", "target_id"),
     )

@@ -4,7 +4,6 @@ Handles business logic for prediction operations.
 """
 
 from typing import List
-from uuid import UUID
 
 from fastapi import HTTPException, status
 
@@ -65,7 +64,7 @@ class PredictionService:
         self,
         prediction_id: int,
         new_label: str,
-        actor_id: UUID,
+        actor_id: int,
     ) -> PredictionOut:
         """
         Relabel a prediction with corrected label.

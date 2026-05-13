@@ -3,8 +3,6 @@
 Handles business logic for user management.
 """
 
-from uuid import UUID
-
 from fastapi import Depends, HTTPException, status
 
 from app.db.dependencies import get_user_repository
@@ -29,7 +27,7 @@ class UserService:
         self.cache_service = cache_service
         self.audit_service = audit_service
 
-    async def get_user(self, user_id: UUID) -> UserOut:
+    async def get_user(self, user_id: int) -> UserOut:
         """Get a user by ID."""
         try:
             user_in_db = await self.user_repo.get_by_id(user_id)
@@ -43,7 +41,7 @@ class UserService:
     async def update_role(
         self,
         actor: UserModel,
-        target_uid: UUID,
+        target_uid: int,
         new_role: str,
     ) -> UserOut:
         """

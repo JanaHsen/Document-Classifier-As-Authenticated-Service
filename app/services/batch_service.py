@@ -4,7 +4,6 @@ Handles business logic for batch operations.
 """
 
 from typing import List
-from uuid import UUID
 
 from fastapi import HTTPException, status
 
@@ -46,7 +45,7 @@ class BatchService:
         return BatchOut.model_validate(batch_in_db)
 
     async def update_batch_state(
-        self, batch_id: int, new_state: BatchStatus, actor_id: UUID
+        self, batch_id: int, new_state: BatchStatus, actor_id: int
     ) -> BatchOut:
         """
         Update the state of a batch.

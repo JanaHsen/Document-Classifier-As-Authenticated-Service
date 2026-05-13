@@ -5,7 +5,6 @@ No business logic, no HTTP exceptions, no cache invalidation.
 """
 
 from typing import Sequence
-from uuid import UUID
 
 from sqlalchemy import select, insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +25,8 @@ class AuditRepository:
         audit_log = AuditLog(
             actor_id=data.actor_id,
             action=data.action,
-            target=data.target,
+            target_type=data.target_type,
+            target_id=data.target_id,
         )
         self.session.add(audit_log)
         await self.session.flush()
@@ -43,7 +43,7 @@ class AuditRepository:
             raise NotFoundError(entity="AuditLog", identifier=str(audit_id))
         return AuditLogInDB.model_validate(audit)
 
-    async def list_by_actor(self, actor_id: UUID, limit: int = 100) -> Sequence[AuditLogInDB]:
+    async def list_by_actor(self, actor_id: int, limit: int = 100) -> Sequence[AuditLogInDB]:
         """Get audit logs for a specific actor."""
         result = await self.session.execute(
             select(AuditLog)

@@ -14,15 +14,13 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 
 # Authentication & Security
-fastapi-users[sqlalchemy]==6.3.0
+fastapi-users[sqlalchemy]==6.1.3
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.1
 email-validator==2.1.0
 
-# RBAC
-casbin==1.32.1
-casbin-sqlalchemy-adapter==1.2.1
+
 
 # Caching & Queue
 redis==5.0.1

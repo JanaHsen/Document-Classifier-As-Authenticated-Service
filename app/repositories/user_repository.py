@@ -4,8 +4,6 @@ Handles all database operations for users.
 No business logic, no HTTP exceptions, no cache invalidation.
 """
 
-from uuid import UUID
-
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +18,7 @@ class UserRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, user_id: UUID) -> UserInDB:
+    async def get_by_id(self, user_id: int) -> UserInDB:
         """Get a single user by ID."""
         result = await self.session.execute(
             select(User).where(User.id == user_id)
@@ -40,7 +38,7 @@ class UserRepository:
             raise NotFoundError(entity="User", identifier=email)
         return UserInDB.model_validate(user)
 
-    async def update_role(self, user_id: UUID, data: UserUpdate) -> UserInDB:
+    async def update_role(self, user_id: int, data: UserUpdate) -> UserInDB:
         """Update a user's role."""
         stmt = (
             update(User)
@@ -54,7 +52,7 @@ class UserRepository:
         await self.session.flush()
         return await self.get_by_id(user_id)
 
-    async def count_admins(self, exclude_user_id: UUID | None = None) -> int:
+    async def count_admins(self, exclude_user_id: int | None = None) -> int:
         """Count how many users have the admin role."""
         from app.core.constants import Role
 

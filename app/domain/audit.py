@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.types import PositiveInt
@@ -11,9 +10,10 @@ from pydantic.types import PositiveInt
 class AuditLogBase(BaseModel):
     """Base audit log schema."""
 
-    actor_id: UUID = Field(..., description="ID of the user who performed the action")
+    actor_id: int = Field(..., description="ID of the user who performed the action")
     action: str = Field(..., max_length=100, description="Action performed")
-    target: str = Field(..., max_length=500, description="Target of the action")
+    target_type: str = Field(..., max_length=50, description="Type of target entity")
+    target_id: int = Field(..., description="ID of the affected record")
 
 
 class AuditLogCreate(AuditLogBase):
