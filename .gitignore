@@ -1,1 +1,11 @@
 ﻿# Owner: HADI
+__pycache__/
+.pytest_cache/
+
+
+.env
+.vscode/
+
+.venv/
+
+tests/
