@@ -4,7 +4,7 @@ Handles all database operations for users.
 No business logic, no HTTP exceptions, no cache invalidation.
 """
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
@@ -51,3 +51,14 @@ class UserRepository:
             raise NotFoundError(entity="User", identifier=str(user_id))
         await self.session.flush()
         return await self.get_by_id(user_id)
+
+    async def count_admins(self, exclude_user_id: int | None = None) -> int:
+        """Count how many users have the admin role."""
+        from app.core.constants import Role
+
+        stmt = select(func.count()).select_from(User).where(User.role == Role.ADMIN)
+        if exclude_user_id is not None:
+            stmt = stmt.where(User.id != exclude_user_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+

@@ -61,3 +61,4 @@ class BatchRepository:
             raise NotFoundError(entity="Batch", identifier=str(batch_id))
         await self.session.flush()
         return await self.get_by_id(batch_id)
+

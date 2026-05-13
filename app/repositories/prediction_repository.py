@@ -66,3 +66,4 @@ class PredictionRepository:
             raise NotFoundError(entity="Prediction", identifier=str(prediction_id))
         await self.session.flush()
         return await self.get_by_id(prediction_id)
+

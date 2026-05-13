@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
-from pydantic.types import PositiveInt
 
 from app.core.constants import Role
 
@@ -31,7 +30,7 @@ class UserUpdate(BaseModel):
 class UserOut(UserBase):
     """Schema for user output (response)."""
 
-    id: PositiveInt = Field(..., description="User ID")
+    id: int = Field(..., description="User ID")
     created_at: datetime = Field(..., description="Account creation timestamp")
 
     model_config = ConfigDict(from_attributes=True)
