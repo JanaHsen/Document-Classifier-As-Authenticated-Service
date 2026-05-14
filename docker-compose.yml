@@ -193,16 +193,28 @@ services:
       context: .
       dockerfile: docker/ingest.Dockerfile
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
       vault:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN:-root}
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/docclassifier
+      DATABASE_SYNC_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/docclassifier
       REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: documents
       SFTP_HOST: sftp
       SFTP_PORT: "22"
       SFTP_USER: docuser
