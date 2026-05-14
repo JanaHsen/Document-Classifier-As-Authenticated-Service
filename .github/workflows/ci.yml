@@ -51,9 +51,9 @@ jobs:
         run: pip install httpx paramiko pytest pytest-timeout
       - name: Run smoke tests
         run: PYTHONPATH=. pytest tests/smoke/ -v --timeout=180
-      - name: Dump API logs on failure
+      - name: Dump all service logs on failure
         if: failure()
-        run: docker compose logs api
+        run: docker compose logs api sftp-ingest worker
       - name: Tear down
         if: always()
         run: docker compose down -v
