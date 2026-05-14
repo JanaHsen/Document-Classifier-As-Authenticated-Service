@@ -11,6 +11,7 @@ import torch
 from app.classifier.inference.overlays import generate_overlay
 from app.classifier.inference.predictor import load_model, predict
 from app.core.config import settings
+from app.core.constants import BatchStatus
 from app.infra.blob.minio_client import download_tiff, upload_overlay
 
 
@@ -23,6 +24,18 @@ def _log(level: str, message: str, **kwargs) -> None:
         **kwargs,
     }
     print(json.dumps(record))
+
+
+async def _update_batch_state(batch_id: int, state: BatchStatus) -> None:
+    """Update batch state directly via repository (no actor — system-initiated)."""
+    from app.db.session import AsyncSessionLocal
+    from app.domain.batch import BatchUpdate
+    from app.repositories.batch_repository import BatchRepository
+
+    async with AsyncSessionLocal() as session:
+        repo = BatchRepository(session)
+        await repo.update_state(batch_id, BatchUpdate(state=state))
+        await session.commit()
 
 
 async def _save_prediction(
@@ -60,30 +73,39 @@ def process_job(job: dict) -> None:
 
     _log("INFO", "job received", request_id=request_id, batch_id=batch_id, blob_path=blob_path)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model  = _get_model(device)
+    asyncio.run(_update_batch_state(batch_id, BatchStatus.PROCESSING))
 
-    # Step 1: download TIFF from MinIO
-    local_tiff = download_tiff(blob_path)
+    try:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model  = _get_model(device)
 
-    # Step 2: run inference
-    result = predict(model, local_tiff, device)
-    _log("INFO", "inference complete", request_id=request_id, label=result.label, confidence=round(result.confidence, 6))
+        # Step 1: download TIFF from MinIO
+        local_tiff = download_tiff(blob_path)
 
-    # Step 3: generate overlay PNG
-    overlay_path = f"overlays/{Path(filename).stem}.png"
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        local_overlay = tmp.name
-    generate_overlay(local_tiff, result.label, result.confidence, local_overlay)
+        # Step 2: run inference
+        result = predict(model, local_tiff, device)
+        _log("INFO", "inference complete", request_id=request_id, label=result.label, confidence=round(result.confidence, 6))
 
-    # Step 4: upload overlay to MinIO
-    upload_overlay(local_overlay, overlay_path)
+        # Step 3: generate overlay PNG
+        overlay_path = f"overlays/{Path(filename).stem}.png"
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            local_overlay = tmp.name
+        generate_overlay(local_tiff, result.label, result.confidence, local_overlay)
 
-    # Step 5: save prediction — PredictionService.create() handles DB write
-    # and cache invalidation (invalidate_predictions_recent + invalidate_batch_detail)
-    asyncio.run(_save_prediction(batch_id, result.label, result.confidence, overlay_path))
+        # Step 4: upload overlay to MinIO
+        upload_overlay(local_overlay, overlay_path)
 
-    _log("INFO", "job complete", request_id=request_id, batch_id=batch_id)
+        # Step 5: save prediction — PredictionService.create() handles DB write
+        # and cache invalidation (invalidate_predictions_recent + invalidate_batch_detail)
+        asyncio.run(_save_prediction(batch_id, result.label, result.confidence, overlay_path))
+
+        asyncio.run(_update_batch_state(batch_id, BatchStatus.COMPLETE))
+        _log("INFO", "job complete", request_id=request_id, batch_id=batch_id)
+
+    except Exception as e:
+        asyncio.run(_update_batch_state(batch_id, BatchStatus.FAILED))
+        _log("ERROR", "job failed", request_id=request_id, batch_id=batch_id, error=str(e))
+        raise
 
 
 _model_cache: dict = {}

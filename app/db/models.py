@@ -89,7 +89,7 @@ class AuditLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     actor_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False
+        Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     action: Mapped[AuditAction] = mapped_column(SQLEnum(AuditAction), nullable=False)
     target_type: Mapped[str] = mapped_column(String(50), nullable=False)

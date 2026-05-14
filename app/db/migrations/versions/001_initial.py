@@ -68,7 +68,7 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
-        sa.Column("actor_id", sa.Integer, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=False, index=True),
+        sa.Column("actor_id", sa.Integer, sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True),
         sa.Column(
             "action",
             sa.Enum("change_role", "relabel_pred", "change_state", name="auditaction"),

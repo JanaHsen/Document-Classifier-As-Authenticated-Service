@@ -6,7 +6,7 @@ No business logic, no HTTP exceptions, no cache invalidation.
 
 from typing import Sequence
 
-from sqlalchemy import select, insert
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import AuditLog

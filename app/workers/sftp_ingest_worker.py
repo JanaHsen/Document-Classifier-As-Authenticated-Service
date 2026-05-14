@@ -1,6 +1,8 @@
 # Owner: HADI
+import asyncio
 import os
 import tempfile
+import time
 import uuid
 
 import paramiko
@@ -18,6 +20,22 @@ SFTP_PORT = int(os.environ.get("SFTP_PORT", "22"))
 SFTP_USER = os.environ.get("SFTP_USER", "docuser")
 SFTP_PASS = os.environ.get("SFTP_PASS", "docpass")
 SFTP_PATH = os.environ.get("SFTP_PATH", "/uploads")
+
+# Files arriving within this window (in seconds) are grouped into the same batch.
+BATCH_WINDOW_SECONDS = 30
+
+
+async def _create_batch() -> int:
+    """Create a new PENDING batch in the DB and return its ID."""
+    from app.db.session import AsyncSessionLocal
+    from app.domain.batch import BatchCreate
+    from app.repositories.batch_repository import BatchRepository
+
+    async with AsyncSessionLocal() as session:
+        repo = BatchRepository(session)
+        batch = await repo.create(BatchCreate())
+        await session.commit()
+        return batch.id
 
 
 def _download_from_sftp(remote_path: str) -> str:
@@ -50,19 +68,34 @@ def main() -> None:
         remote_path=SFTP_PATH,
     )
 
+    current_batch_id: int | None = None
+    last_file_time: float = 0.0
+
     for remote_path in watcher.watch():
         request_id = str(uuid.uuid4())
         filename = os.path.basename(remote_path)
+        now = time.time()
 
         try:
+            # Start a new batch if none exists or the window has expired
+            if current_batch_id is None or (now - last_file_time) > BATCH_WINDOW_SECONDS:
+                current_batch_id = asyncio.run(_create_batch())
+                logger.info("new batch created", extra={"batch_id": current_batch_id})
+            last_file_time = now
+
             local_path = _download_from_sftp(remote_path)
             blob_path = _upload_to_minio(local_path, filename)
+            enqueue_inference_job(
+                batch_id=current_batch_id,
+                blob_path=blob_path,
+                request_id=request_id,
+            )
 
-            # batch_id=0 is a placeholder — the real batch ID comes from
-            # the batch service once the upload endpoint is wired up
-            enqueue_inference_job(batch_id=0, blob_path=blob_path, request_id=request_id)
-
-            logger.info("job enqueued", extra={"request_id": request_id, "blob_path": blob_path})
+            logger.info("job enqueued", extra={
+                "request_id": request_id,
+                "batch_id": current_batch_id,
+                "blob_path": blob_path,
+            })
         except Exception as e:
             logger.error("failed to process file", extra={"path": remote_path, "error": str(e)})
 
