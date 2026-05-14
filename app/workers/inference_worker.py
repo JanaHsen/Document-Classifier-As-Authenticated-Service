@@ -82,25 +82,40 @@ def process_job(job: dict) -> None:
     filename   = Path(blob_path).name
 
     _log("INFO", "job received", request_id=request_id, batch_id=batch_id, blob_path=blob_path)
-    _update_batch_state(batch_id, BatchStatus.PROCESSING)
 
     try:
+        t0 = time.time()
+        _update_batch_state(batch_id, BatchStatus.PROCESSING)
+        _log("INFO", "step: state=PROCESSING", request_id=request_id, elapsed=round(time.time() - t0, 2))
+
+        t0 = time.time()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model  = _get_model(device)
+        _log("INFO", "step: model loaded", request_id=request_id, elapsed=round(time.time() - t0, 2))
 
+        t0 = time.time()
         local_tiff = download_tiff(blob_path)
+        _log("INFO", "step: tiff downloaded", request_id=request_id, elapsed=round(time.time() - t0, 2))
 
+        t0 = time.time()
         result = predict(model, local_tiff, device)
-        _log("INFO", "inference complete", request_id=request_id, label=result.label, confidence=round(result.confidence, 6))
+        _log("INFO", "step: inference complete", request_id=request_id, elapsed=round(time.time() - t0, 2), label=result.label, confidence=round(result.confidence, 6))
 
         overlay_path = f"overlays/{Path(filename).stem}.png"
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             local_overlay = tmp.name
+
+        t0 = time.time()
         generate_overlay(local_tiff, result.label, result.confidence, local_overlay)
+        _log("INFO", "step: overlay generated", request_id=request_id, elapsed=round(time.time() - t0, 2))
 
+        t0 = time.time()
         upload_overlay(local_overlay, overlay_path)
+        _log("INFO", "step: overlay uploaded", request_id=request_id, elapsed=round(time.time() - t0, 2))
 
+        t0 = time.time()
         _save_prediction(batch_id, result.label, result.confidence, overlay_path)
+        _log("INFO", "step: prediction saved", request_id=request_id, elapsed=round(time.time() - t0, 2))
 
         _update_batch_state(batch_id, BatchStatus.COMPLETE)
         _log("INFO", "job complete", request_id=request_id, batch_id=batch_id)
