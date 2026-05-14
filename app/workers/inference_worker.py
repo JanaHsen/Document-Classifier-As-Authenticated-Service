@@ -1,4 +1,5 @@
 # Owner: HAWRAA
+import asyncio
 import json
 import tempfile
 import time
@@ -10,27 +11,9 @@ import torch
 from app.classifier.inference.overlays import generate_overlay
 from app.classifier.inference.postprocessing import format_prediction
 from app.classifier.inference.predictor import load_model, predict
+from app.core.config import settings
+from app.infra.blob.minio_client import download_tiff, upload_overlay
 
-# ---------------------------------------------------------------------------
-# MOCK IMPORTS — replace each line when merging with teammates
-# ---------------------------------------------------------------------------
-
-# Replace with: from app.infra.blob.minio_client import download_tiff, upload_overlay
-from mock_hawraa.mock_minio import download_tiff, upload_overlay
-
-# Replace with: from app.services.prediction_service import save_prediction
-from mock_hawraa.mock_prediction_service import save_prediction
-
-# Replace with: from app.services.cache_service import invalidate_batch
-from mock_hawraa.mock_cache_service import invalidate_batch
-
-# RQ queue swap: see main() below
-# Replace with: from redis import Redis / from rq import Worker, Queue
-
-# ---------------------------------------------------------------------------
-# Logging — structured JSON per contract
-# Replace with Hadi's logger when merged: from app.infra.logging.logger import log
-# ---------------------------------------------------------------------------
 
 def _log(level: str, message: str, **kwargs) -> None:
     record = {
@@ -43,9 +26,32 @@ def _log(level: str, message: str, **kwargs) -> None:
     print(json.dumps(record))
 
 
-# ---------------------------------------------------------------------------
-# Job processor — called by RQ for each job
-# ---------------------------------------------------------------------------
+async def _save_prediction(
+    batch_id: int, label: str, confidence: float, overlay_path: str
+) -> None:
+    """Save prediction to DB via PredictionService (handles DB write + cache invalidation)."""
+    from app.db.session import AsyncSessionLocal
+    from app.repositories.audit_repository import AuditRepository
+    from app.repositories.prediction_repository import PredictionRepository
+    from app.services.audit_service import AuditService
+    from app.services.cache_service import CacheService
+    from app.services.prediction_service import PredictionService
+
+    async with AsyncSessionLocal() as session:
+        prediction_service = PredictionService(
+            prediction_repo=PredictionRepository(session),
+            cache_service=CacheService(),
+            audit_service=AuditService(
+                audit_repository=AuditRepository(session)
+            ),
+        )
+        await prediction_service.create(
+            batch_id=batch_id,
+            label=label,
+            confidence=confidence,
+            overlay_path=overlay_path,
+        )
+
 
 def process_job(job: dict) -> None:
     batch_id   = job["batch_id"]
@@ -74,22 +80,12 @@ def process_job(job: dict) -> None:
     # Step 4: upload overlay to MinIO
     upload_overlay(local_overlay, overlay_path)
 
-    # Step 5: save prediction to DB via service layer
-    prediction = format_prediction(batch_id, result.label, result.confidence, overlay_path)
-    save_prediction(prediction)
-
-    # Step 6: invalidate cache via service layer
-    # NOTE: when swapping Step 5 to the real PredictionService.create(), cache invalidation
-    # (invalidate_predictions_recent + invalidate_batch_detail) already happens inside create().
-    # Remove this step entirely when doing the real integration.
-    invalidate_batch(batch_id)
+    # Step 5: save prediction — PredictionService.create() handles DB write
+    # and cache invalidation (invalidate_predictions_recent + invalidate_batch_detail)
+    asyncio.run(_save_prediction(batch_id, result.label, result.confidence, overlay_path))
 
     _log("INFO", "job complete", request_id=request_id, batch_id=batch_id)
 
-
-# ---------------------------------------------------------------------------
-# Model is loaded once at startup, not per job
-# ---------------------------------------------------------------------------
 
 _model_cache: dict = {}
 
@@ -101,27 +97,28 @@ def _get_model(device: torch.device) -> torch.nn.Module:
     return _model_cache[key]
 
 
-# ---------------------------------------------------------------------------
-# Entrypoint
-# ---------------------------------------------------------------------------
+async def _init_cache() -> None:
+    """Initialize FastAPICache so CacheService.invalidate_* works in the worker process."""
+    import redis.asyncio as aioredis
+    from fastapi_cache import FastAPICache
+    from app.infra.cache.redis_cache import _RedisBackend
+    r = aioredis.from_url(settings.REDIS_URL)
+    FastAPICache.init(_RedisBackend(r), prefix="docclass")
+
 
 def main() -> None:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from redis import Redis
+    from rq import Worker, Queue
 
-    # Startup: validate and load model — raises if weights missing or SHA-256 mismatch
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _get_model(device)
     _log("INFO", "worker started, model loaded")
 
-    # MOCK: single test job
-    # Replace with real RQ worker when merging:
-    #   from redis import Redis
-    #   from rq import Worker, Queue
-    #   from app.core.config import settings
-    #   redis_conn = Redis.from_url(settings.REDIS_URL)
-    #   queue = Queue("inference", connection=redis_conn)
-    #   Worker([queue], connection=redis_conn).work()
-    from mock_hawraa.mock_queue import start_mock_worker
-    start_mock_worker(process_job)
+    asyncio.run(_init_cache())
+
+    redis_conn = Redis.from_url(settings.REDIS_URL)
+    queue = Queue("inference", connection=redis_conn)
+    Worker([queue], connection=redis_conn).work()
 
 
 if __name__ == "__main__":
