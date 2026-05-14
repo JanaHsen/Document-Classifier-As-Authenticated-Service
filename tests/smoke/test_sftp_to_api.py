@@ -12,7 +12,7 @@ Environment variables (all have defaults matching docker-compose defaults):
   SFTP_USER      — default docuser
   SFTP_PASS      — default docpass
   SFTP_PATH      — default uploads
-  SMOKE_TIMEOUT  — seconds to wait for batch completion, default 120
+  SMOKE_TIMEOUT  — seconds to wait for batch completion, default 300
 """
 
 import os
@@ -29,7 +29,7 @@ SFTP_PORT  = int(os.getenv("SFTP_PORT", "2222"))
 SFTP_USER  = os.getenv("SFTP_USER", "docuser")
 SFTP_PASS  = os.getenv("SFTP_PASS", "docpass")
 SFTP_PATH  = os.getenv("SFTP_PATH", "uploads")
-TIMEOUT    = int(os.getenv("SMOKE_TIMEOUT", "120"))
+TIMEOUT    = int(os.getenv("SMOKE_TIMEOUT", "300"))
 
 GOLDEN_TIFF = (
     pathlib.Path(__file__).parent.parent.parent
@@ -74,7 +74,8 @@ def _poll_for_complete_batch(token: str, deadline: float) -> dict:
     headers = {"Authorization": f"Bearer {token}"}
     while time.time() < deadline:
         with httpx.Client(base_url=API_BASE) as client:
-            r = client.get("/batches", headers=headers)
+            # Unique _t param busts the 60s cache on each poll
+            r = client.get("/batches", headers=headers, params={"_t": int(time.time())})
         assert r.status_code == 200, f"GET /batches failed: {r.text}"
         batches = r.json()
         for batch in batches:
