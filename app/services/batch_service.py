@@ -13,6 +13,7 @@ from app.exceptions import NotFoundError
 from app.repositories.batch_repository import BatchRepository
 from app.services.audit_service import AuditService
 from app.services.cache_service import CacheService
+from app.api.schemas.batch import BatchRead
 
 
 class BatchService:
@@ -28,21 +29,36 @@ class BatchService:
         self.cache_service = cache_service
         self.audit_service = audit_service
 
-    async def list_batches(self) -> List[BatchOut]:
+    async def list_batches(self) -> list[BatchRead]:
         """List all batches, newest first."""
         batches = await self.batch_repo.list_all()
-        return [BatchOut.model_validate(b) for b in batches]
+        # Convert domain BatchInDB to API BatchRead.
+        # file_count is set to 0 (computed separately if needed)
+        return [
+            BatchRead(
+                id=b.id,
+                created_at=b.created_at,
+                status=b.state,
+                file_count=0,
+            )
+            for b in batches
+        ]
 
-    async def get_batch(self, batch_id: int) -> BatchOut:
+    async def get_batch(self, batch_id: int) -> BatchRead:
         """Get a single batch by ID."""
         try:
-            batch_in_db = await self.batch_repo.get_by_id(batch_id)
+            b = await self.batch_repo.get_by_id(batch_id)
         except NotFoundError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Batch with id '{batch_id}' not found",
             )
-        return BatchOut.model_validate(batch_in_db)
+        return BatchRead(
+            id=b.id,
+            created_at=b.created_at,
+            status=b.state,
+            file_count=0,
+        )
 
     async def update_batch_state(
         self, batch_id: int, new_state: BatchStatus, actor_id: int

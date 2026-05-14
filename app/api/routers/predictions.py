@@ -32,6 +32,7 @@ from app.services.prediction_service import (
     PredictionService,
     get_prediction_service,
 )
+from fastapi_cache.decorator import cache
 
 
 router = APIRouter()
@@ -43,6 +44,7 @@ router = APIRouter()
     summary="List recent predictions (all three roles)",
     dependencies=[Depends(require_permission("predictions", "read"))],
 )
+@cache(expire=30)
 async def get_recent_predictions(
     prediction_service: PredictionService = Depends(get_prediction_service),
 ):
@@ -93,7 +95,7 @@ async def relabel_prediction(
     side effects live in the service layer, not the router.
     """
     return await prediction_service.relabel(
-        reviewer=reviewer,
-        pid=pid,
+        prediction_id=pid,
         new_label=body.label,
+        actor_id=reviewer.id,
     )

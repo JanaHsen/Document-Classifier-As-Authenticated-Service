@@ -3,7 +3,7 @@
 Handles audit log creation with business rules.
 """
 
-from app.domain.audit import AuditLogCreate, AuditLogOut
+from app.domain.audit import AuditLogCreate, AuditLogInDB, AuditLogOut
 from app.repositories.audit_repository import AuditRepository
 
 
@@ -23,7 +23,8 @@ class AuditService:
             target_type=target_type,
             target_id=target_id,
         )
-        return await self.audit_repository.create(audit_in)
+        audit_in_db = await self.audit_repository.create(audit_in)
+        return AuditLogOut.model_validate(audit_in_db)
 
     async def log_role_change(
         self, actor_id: int, target_user_id: int, old_role: str, new_role: str
@@ -55,6 +56,15 @@ class AuditService:
             target_id=prediction_id,
         )
 
+    async def list_entries(
+        self, actor: int | None = None, action: str | None = None, limit: int = 100
+    ) -> list[AuditLogOut]:
+        """List audit log entries with optional filters."""
+        audits_in_db = await self.audit_repository.list_entries(
+            actor_id=actor, action=action, limit=limit
+        )
+        return [AuditLogOut.model_validate(a) for a in audits_in_db]
+
 
 # Dependency provider
 from fastapi import Depends
@@ -63,7 +73,7 @@ from app.db.dependencies import get_audit_repository
 
 
 async def get_audit_service(
-    audit_repo: AuditRepository = Depends(get_audit_repository),
+    audit_repository: AuditRepository = Depends(get_audit_repository),
 ) -> AuditService:
     """FastAPI dependency for AuditService."""
-    return AuditService(audit_repo=audit_repo)
+    return AuditService(audit_repository=audit_repository)

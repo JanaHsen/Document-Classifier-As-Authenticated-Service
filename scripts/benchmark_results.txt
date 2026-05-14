@@ -1,0 +1,4 @@
+GET /users/me: uncached_p95=6.65ms, cached_p95=4.75ms
+GET /batches: uncached_p95=27.03ms, cached_p95=7.15ms
+GET /batches/{id}: uncached_p95=9.49ms, cached_p95=6.50ms
+GET /predictions/recent: uncached_p95=11.89ms, cached_p95=6.69ms
