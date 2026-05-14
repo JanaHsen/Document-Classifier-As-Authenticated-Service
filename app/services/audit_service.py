@@ -73,7 +73,7 @@ from app.db.dependencies import get_audit_repository
 
 
 async def get_audit_service(
-    audit_repo: AuditRepository = Depends(get_audit_repository),
+    audit_repository: AuditRepository = Depends(get_audit_repository),
 ) -> AuditService:
     """FastAPI dependency for AuditService."""
-    return AuditService(audit_repo=audit_repo)
+    return AuditService(audit_repository=audit_repository)

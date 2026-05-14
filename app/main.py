@@ -5,11 +5,7 @@ FastAPI app entry point.
   - Mounts 5 routers (auth, users, batches, predictions, audit-log)
   - Verifies on startup that the Casbin policy table is seeded
     (Card 3's "API refuses to boot if policy table empty")
-
-When Hadi's Settings module lands, swap the hardcoded title and
-description below for values from Settings. When Tarek's real
-services adopt @cache decorators, initialize fastapi-cache2 inside
-the lifespan (see TODO).
+  - Initializes Redis-backed cache via fastapi-cache2
 """
 
 from contextlib import asynccontextmanager
@@ -22,6 +18,11 @@ from app.api.routers.batches import router as batches_router
 from app.api.routers.predictions import router as predictions_router
 from app.api.routers.users import router as users_router
 from app.auth.casbin import assert_policies_seeded
+from app.core.config import settings
+
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+import redis.asyncio as redis
 
 
 @asynccontextmanager
@@ -32,30 +33,21 @@ async def lifespan(app: FastAPI):
     On startup:
       - assert_policies_seeded() raises RuntimeError if the Casbin
         policy table is empty. The exception propagates and the
-        app fails to start. This is the brief's "refuse to boot"
-        enforcement for the policy table.
+        app fails to start.
+      - Initialize Redis-backed cache (fastapi-cache2).
 
     On shutdown:
-      - nothing for now.
-
-    TODO Hadi / Tarek: when fastapi-cache2 is needed (i.e., when
-    real services start applying @cache decorators), initialize it
-    here. Sketch:
-
-        from fastapi_cache import FastAPICache
-        from fastapi_cache.backends.redis import RedisBackend
-        from redis import asyncio as aioredis
-
-        redis = aioredis.from_url(REDIS_URL)
-        FastAPICache.init(RedisBackend(redis), prefix="docclass")
-        yield
-        await redis.close()
-
-    Until then, the mock services don't cache and the app boots
-    without a Redis dependency.
+      - Close Redis connection.
     """
     assert_policies_seeded()
+
+    # Initialize fastapi-cache2 with Redis backend
+    redis_client = redis.from_url(settings.REDIS_URL)
+    FastAPICache.init(RedisBackend(redis_client), prefix="docclass")
+
     yield
+
+    await redis_client.close()
 
 
 # App metadata. Hadi will refactor these into a Settings module

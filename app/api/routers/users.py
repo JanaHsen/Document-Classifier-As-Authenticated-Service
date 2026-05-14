@@ -1,14 +1,47 @@
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
+from app.api.deps.auth import current_active_user
 from app.api.deps.permissions import require_permission
 from app.api.schemas.auth import RoleToggleRequest
 from app.domain.user import UserOut
 from app.db.models import User
 from app.services.user_service import UserService, get_user_service
+from fastapi_cache.decorator import cache
+
+
+def user_cache_key_builder(
+    func,
+    namespace: str = "",
+    request: Request = None,
+    response: Response = None,
+    *args,
+    **kwargs,
+):
+    """
+    Cache key builder for user-specific endpoints.
+    Incorporates the current user's ID to ensure isolation.
+    """
+    current_user: User = kwargs.get("current_user")
+    if current_user is not None:
+        return f"{namespace}{request.url.path}:user_{current_user.id}"
+    # default fallback
+    query = request.url.query
+    return f"{namespace}{request.url.path}:{query}" if query else f"{namespace}{request.url.path}"
 
 
 router = APIRouter()
+
+
+@router.get(
+    "/me",
+    response_model=UserOut,
+    summary="Get current user profile",
+)
+@cache(expire=60, key_builder=user_cache_key_builder)
+async def get_me(current_user: User = Depends(current_active_user)):
+    """Return the authenticated user's profile."""
+    return current_user
 
 
 @router.patch(
@@ -31,31 +64,31 @@ async def update_user_role(
     user_service: UserService = Depends(get_user_service),
 ) -> UserOut:
     """
-PATCH /users/{uid}/role — change a user's role.
+    PATCH /users/{uid}/role — change a user's role.
 
-The auth chain (resolved by FastAPI before this body runs):
-  1. current_active_user — extracts and validates the JWT.
-     Returns 401 if missing, expired, or malformed.
-     (Chained transitively through require_permission.)
-  2. require_permission("users.role", "toggle") — Casbin check.
-     Returns 403 if the caller's role lacks the policy.
+    The auth chain (resolved by FastAPI before this body runs):
+      1. current_active_user — extracts and validates the JWT.
+         Returns 401 if missing, expired, or malformed.
+         (Chained transitively through require_permission.)
+      2. require_permission("users.role", "toggle") — Casbin check.
+         Returns 403 if the caller's role lacks the policy.
 
-By the time we enter the body, the caller is an authenticated
-admin (per the seeded policy table, only the 'admin' role has
-users.role:toggle). All remaining business rules — the
-sole-admin self-demotion check, the DB update, the Casbin
-policy mutation, and the audit log entry — live in
-UserService.update_role.
+    By the time we enter the body, the caller is an authenticated
+    admin (per the seeded policy table, only the 'admin' role has
+    users.role:toggle). All remaining business rules — the
+    sole-admin self-demotion check, the DB update, the Casbin
+    policy mutation, and the audit log entry — live in
+    UserService.update_role.
 
-body.role is a Role enum (Pydantic guarantees one of three
-valid values); we pass it through unchanged. The conversion to
-a DB string happens at the SQLEnum boundary in the ORM, not in
-the router.
+    body.role is a Role enum (Pydantic guarantees one of three
+    valid values); we pass it through unchanged. The conversion to
+    a DB string happens at the SQLEnum boundary in the ORM, not in
+    the router.
 
-Returns the updated user as UserOut, which excludes
-hashed_password and the fastapi-users internal flags
-(is_active, is_superuser, is_verified).
-"""
+    Returns the updated user as UserOut, which excludes
+    hashed_password and the fastapi-users internal flags
+    (is_active, is_superuser, is_verified).
+    """
     return await user_service.update_role(
         actor=actor,
         target_uid=uid,

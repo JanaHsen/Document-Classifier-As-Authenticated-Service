@@ -30,6 +30,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps.permissions import require_permission
 from app.api.schemas.batch import BatchRead
 from app.services.batch_service import BatchService, get_batch_service
+from fastapi_cache.decorator import cache
 
 
 router = APIRouter()
@@ -41,6 +42,7 @@ router = APIRouter()
     summary="List batches (all three roles)",
     dependencies=[Depends(require_permission("batches", "read"))],
 )
+@cache(expire=60)
 async def list_batches(
     batch_service: BatchService = Depends(get_batch_service),
 ):
@@ -51,7 +53,7 @@ async def list_batches(
       1. current_active_user (chained from require_permission) —
          401 if JWT is missing, malformed, or expired.
       2. require_permission("batches", "read") — 403 if the caller's
-         role lacks batches:read.
+          role lacks batches:read.
 
     The seeded policy table grants batches:read to all three roles,
     so any authenticated active user reaches the body.
@@ -70,6 +72,7 @@ async def list_batches(
     summary="Get one batch by id (all three roles)",
     dependencies=[Depends(require_permission("batches", "read"))],
 )
+@cache(expire=60)
 async def get_batch(
     bid: int,
     batch_service: BatchService = Depends(get_batch_service),

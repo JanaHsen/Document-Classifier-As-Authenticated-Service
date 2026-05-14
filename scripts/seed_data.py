@@ -2,7 +2,7 @@
 """Seed the database with sample data for testing and development.
 
 This script populates all tables with realistic sample data:
-- Users (admin, reviewer, auditor)
+- Users (admin, reviewer, auditor) with real bcrypt password hashes
 - Batches (various states)
 - Predictions (linked to batches)
 - Audit logs (tracking user actions)
@@ -35,15 +35,28 @@ from app.db.models import User, Batch, Prediction, AuditLog
 from app.core.constants import Role, BatchStatus
 from app.core.config import settings
 
+# Import bcrypt for password hashing
+import bcrypt
+
+
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt."""
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Sample data definitions
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Pre-hashed passwords for seed users
+ADMIN_PASSWORD = "AdminPass123!"
+REVIEWER_PASSWORD = "ReviewerPass123!"
+AUDITOR_PASSWORD = "AuditorPass123!"
+
 USERS = [
     {
         "email": "admin@example.com",
-        "hashed_password": "hashed_admin_pw_123",
+        "hashed_password": hash_password(ADMIN_PASSWORD),
         "role": Role.ADMIN,
         "is_active": True,
         "is_superuser": False,
@@ -51,7 +64,7 @@ USERS = [
     },
     {
         "email": "reviewer1@example.com",
-        "hashed_password": "hashed_reviewer_pw_123",
+        "hashed_password": hash_password(REVIEWER_PASSWORD),
         "role": Role.REVIEWER,
         "is_active": True,
         "is_superuser": False,
@@ -59,7 +72,7 @@ USERS = [
     },
     {
         "email": "reviewer2@example.com",
-        "hashed_password": "hashed_reviewer_pw_123",
+        "hashed_password": hash_password(REVIEWER_PASSWORD),
         "role": Role.REVIEWER,
         "is_active": True,
         "is_superuser": False,
@@ -67,7 +80,7 @@ USERS = [
     },
     {
         "email": "auditor@example.com",
-        "hashed_password": "hashed_auditor_pw_123",
+        "hashed_password": hash_password(AUDITOR_PASSWORD),
         "role": Role.AUDITOR,
         "is_active": True,
         "is_superuser": False,
@@ -164,7 +177,12 @@ async def seed_predictions(session: AsyncSession, batches: dict[int, Batch]) -> 
         num_preds = PREDICTIONS_PER_BATCH[batch_idx]
         for i in range(num_preds):
             label = PREDICTION_LABELS[(batch_idx * 3 + i) % len(PREDICTION_LABELS)]
-            confidence = round(0.70 + (i * 0.08), 2)
+            # Create a mix of low and high confidence predictions
+            # First prediction in each batch gets low confidence (< 0.7)
+            if i == 0:
+                confidence = round(0.50 + (i * 0.05), 2)  # 0.50, 0.55, etc.
+            else:
+                confidence = round(0.70 + (i * 0.08), 2)
             overlay_path = OVERLAY_PATHS[overlay_idx % len(OVERLAY_PATHS)]
             overlay_idx += 1
             try:
@@ -183,6 +201,9 @@ async def seed_predictions(session: AsyncSession, batches: dict[int, Batch]) -> 
     for pred in predictions:
         await session.refresh(pred)
     print(f"  Created {len(predictions)} predictions: IDs={[p.id for p in predictions]}")
+    # Print confidence values for debugging
+    confidences = [p.confidence for p in predictions]
+    print(f"  Confidences: {confidences}")
     return predictions
 
 
@@ -285,12 +306,16 @@ async def main():
                 await seed_audit_logs(session, users, batches, predictions)
 
             await session.commit()
-            print("\n✅ All data seeded successfully!")
+            print("\nAll data seeded successfully!")
             print(f"   Users: {len(users)} (admin: {next(u.id for u in users.values() if u.role == Role.ADMIN)}, "
                   f"reviewer: {next(u.id for u in users.values() if u.role == Role.REVIEWER)}, "
                   f"auditor: {next(u.id for u in users.values() if u.role == Role.AUDITOR)})")
             print(f"   Batches: {len(batches)} (states: {[b.state.value for b in batches.values()]})")
             print(f"   Predictions: {len(predictions)}")
+            print("\nPre-seeded user credentials:")
+            print(f"   Admin:     {ADMIN_PASSWORD}")
+            print(f"   Reviewer:  {REVIEWER_PASSWORD}")
+            print(f"   Auditor:   {AUDITOR_PASSWORD}")
         except Exception as e:
             print(f"\n❌ Error during seeding: {e}")
             traceback.print_exc()
