@@ -17,7 +17,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.middleware.request_id import add_request_id_middleware
-from app.infra.cache.redis_cache import close_cache, init_cache
 from app.api.routers.audit import router as audit_router
 from app.api.routers.auth import router as auth_router
 from app.api.routers.batches import router as batches_router
@@ -57,9 +56,7 @@ async def lifespan(app: FastAPI):
     without a Redis dependency.
     """
     assert_policies_seeded()
-    await init_cache(app)
     yield
-    await close_cache()
 
 
 # App metadata. Hadi will refactor these into a Settings module
