@@ -36,7 +36,7 @@ GOLDEN_TIFF = (
     / "app/classifier/eval/golden_images/test.tiff"
 )
 
-TEST_EMAIL    = f"smoke-{uuid.uuid4().hex[:8]}@test.local"
+TEST_EMAIL    = f"smoke-{uuid.uuid4().hex[:8]}@example.com"
 TEST_PASSWORD = "Smoke1234!"
 
 
