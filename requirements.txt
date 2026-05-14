@@ -34,6 +34,7 @@ psycopg[binary]
 paramiko
 
 # ── Classifier and Inference (Hawraa) ──────────────────────────────────────────
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.4
 torchvision>=0.19
 Pillow
