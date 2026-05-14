@@ -1,1 +1,51 @@
-﻿# Owner: HADI
+# Owner: HADI
+name: CI
+
+on:
+  push:
+    branches: ["main", "feat/**"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+
+  golden-set:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run golden set evaluation
+        run: python app/classifier/eval/golden.py
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Copy env file
+        run: cp .env.example .env
+      - name: Build and start stack
+        run: docker compose up -d --build --wait
+        timeout-minutes: 10
+      - name: Check API is reachable
+        run: curl -f http://localhost:8000/docs
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

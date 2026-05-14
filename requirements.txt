@@ -30,6 +30,7 @@ rq
 redis==5.0.1
 minio
 hvac
+psycopg[binary]
 
 # ── Classifier and Inference (Hawraa) ──────────────────────────────────────────
 torch>=2.4

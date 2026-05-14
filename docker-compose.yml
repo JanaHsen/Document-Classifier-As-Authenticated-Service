@@ -1,1 +1,213 @@
-﻿# Owner: HADI
+# Owner: HADI
+services:
+
+  # ── Infrastructure ────────────────────────────────────────────────────────────
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: docclassifier
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+        mc mb --ignore-existing local/documents;
+        mc mb --ignore-existing local/overlays;
+        echo 'MinIO buckets ready';
+      "
+    restart: on-failure
+
+  vault:
+    image: hashicorp/vault:1.15
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-root}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vault-init:
+    image: hashicorp/vault:1.15
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-changeme-dev-secret}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - ./docker/vault/init-vault.sh:/init-vault.sh
+    entrypoint: ["/bin/sh", "/init-vault.sh"]
+    restart: on-failure
+
+  sftp:
+    image: atmoz/sftp
+    ports:
+      - "${SFTP_PORT:-2222}:22"
+    command: docuser:docpass:::uploads
+
+  # ── Database migrations + policy seeding ─────────────────────────────────────
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-root}
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/docclassifier
+      DATABASE_SYNC_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/docclassifier
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        alembic upgrade head
+        python scripts/seed_policies.py
+    restart: on-failure
+
+  # ── Application services ──────────────────────────────────────────────────────
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      vault:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-root}
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/docclassifier
+      DATABASE_SYNC_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/docclassifier
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: documents
+      DEBUG: "false"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8000/docs || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-root}
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/docclassifier
+      DATABASE_SYNC_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/docclassifier
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: documents
+
+  sftp-ingest:
+    build:
+      context: .
+      dockerfile: docker/ingest.Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-root}
+      REDIS_URL: redis://redis:6379/0
+      SFTP_HOST: sftp
+      SFTP_PORT: "22"
+      SFTP_USER: docuser
+      SFTP_PASS: docpass
+      SFTP_PATH: /uploads
+
+volumes:
+  postgres_data:
+  minio_data:

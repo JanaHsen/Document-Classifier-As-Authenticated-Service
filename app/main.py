@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.middleware.request_id import add_request_id_middleware
 from app.api.routers.audit import router as audit_router
 from app.api.routers.auth import router as auth_router
 from app.api.routers.batches import router as batches_router
@@ -72,6 +73,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+add_request_id_middleware(app)
 
 # Mount all routers. URL prefixes live here, not in the router
 # files, so the entire URL surface is visible in one place. Tags
