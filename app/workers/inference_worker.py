@@ -138,7 +138,7 @@ def _get_model(device: torch.device) -> torch.nn.Module:
 
 def main() -> None:
     from redis import Redis
-    from rq import Worker, Queue
+    from rq import SimpleWorker, Queue
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _get_model(device)
@@ -146,7 +146,11 @@ def main() -> None:
 
     redis_conn = Redis.from_url(settings.REDIS_URL)
     queue = Queue("inference", connection=redis_conn, default_timeout=600)
-    Worker([queue], connection=redis_conn).work()
+    # SimpleWorker runs jobs in-process (no fork). PyTorch's OpenMP/MKL
+    # thread pools created at import time don't survive fork() and cause
+    # the first model call in the child to deadlock — SimpleWorker avoids
+    # this entirely by reusing the parent process.
+    SimpleWorker([queue], connection=redis_conn).work()
 
 
 if __name__ == "__main__":
