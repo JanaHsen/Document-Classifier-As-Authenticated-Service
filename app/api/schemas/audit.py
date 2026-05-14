@@ -1,6 +1,8 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
+from app.core.constants import AuditAction
+
 
 class AuditLogEntry(BaseModel):
 
@@ -8,6 +10,9 @@ class AuditLogEntry(BaseModel):
 
     id: int
     actor_id: int
-    action: str
-    target: str
+    action: AuditAction
+    target_type: str
+    target_id: int
+    old_value: dict | None = None
+    new_value: dict | None = None
     timestamp: datetime
