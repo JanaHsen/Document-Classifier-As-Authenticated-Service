@@ -15,7 +15,7 @@ bcrypt==4.1.2
 email-validator==2.1.0
 
 # ── Cache (Tarek) ──────────────────────────────────────────────────────────────
-# fastapi-cache2[redis]  # re-enable when @cache decorators are added to services
+fastapi-cache2  # no [redis] extra — avoids aioredis which breaks on Python 3.12
 
 # ── Database (Tarek) ───────────────────────────────────────────────────────────
 sqlalchemy==2.0.25
