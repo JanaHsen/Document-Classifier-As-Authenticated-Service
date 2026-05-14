@@ -59,7 +59,7 @@ def load_model(device: torch.device) -> nn.Module:
     labels = _load_labels()
     model = convnext_tiny(weights=None)
     model.classifier[2] = nn.Linear(model.classifier[2].in_features, len(labels))
-    model.load_state_dict(torch.load(WEIGHTS_PATH, map_location=device))
+    model.load_state_dict(torch.load(WEIGHTS_PATH, map_location=device, weights_only=True))
     model.to(device)
     model.eval()
     return model
