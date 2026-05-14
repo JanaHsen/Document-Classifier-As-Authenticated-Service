@@ -19,11 +19,7 @@ from app.api.routers.batches import router as batches_router
 from app.api.routers.predictions import router as predictions_router
 from app.api.routers.users import router as users_router
 from app.auth.casbin import assert_policies_seeded
-from app.core.config import settings
-
-from fastapi_cache import FastAPICache
-from fastapi_cache.backends.redis import RedisBackend
-import redis.asyncio as redis
+from app.infra.cache.redis_cache import close_cache, init_cache
 
 
 @asynccontextmanager
@@ -41,14 +37,9 @@ async def lifespan(app: FastAPI):
       - Close Redis connection.
     """
     assert_policies_seeded()
-
-    # Initialize fastapi-cache2 with Redis backend
-    redis_client = redis.from_url(settings.REDIS_URL)
-    FastAPICache.init(RedisBackend(redis_client), prefix="docclass")
-
+    await init_cache(app)
     yield
-
-    await redis_client.close()
+    await close_cache()
 
 
 # App metadata. Hadi will refactor these into a Settings module
