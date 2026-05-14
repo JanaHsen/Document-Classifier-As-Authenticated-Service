@@ -26,10 +26,18 @@ def _log(level: str, message: str, **kwargs) -> None:
     print(json.dumps(record), flush=True)
 
 
+def _pg2_url() -> str:
+    # psycopg3 is not fork-safe (libpq state corrupts after RQ forks work-horse).
+    # psycopg2-binary is fork-safe and already installed.
+    return settings.DATABASE_SYNC_URL.replace(
+        "postgresql+psycopg://", "postgresql+psycopg2://"
+    )
+
+
 def _update_batch_state(batch_id: int, state: BatchStatus) -> None:
     from sqlalchemy import create_engine, text
     from sqlalchemy.pool import NullPool
-    engine = create_engine(settings.DATABASE_SYNC_URL, poolclass=NullPool)
+    engine = create_engine(_pg2_url(), poolclass=NullPool)
     with engine.begin() as conn:
         conn.execute(
             text("UPDATE batches SET state = :state, updated_at = NOW() WHERE id = :id"),
@@ -43,7 +51,7 @@ def _save_prediction(batch_id: int, label: str, confidence: float, overlay_path:
     from sqlalchemy.pool import NullPool
     import redis as sync_redis
 
-    engine = create_engine(settings.DATABASE_SYNC_URL, poolclass=NullPool)
+    engine = create_engine(_pg2_url(), poolclass=NullPool)
     with engine.begin() as conn:
         conn.execute(
             text(
