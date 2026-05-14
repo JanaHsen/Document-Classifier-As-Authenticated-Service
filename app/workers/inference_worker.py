@@ -51,29 +51,33 @@ async def _update_batch_state(batch_id: int, state: BatchStatus) -> None:
 async def _save_prediction(
     batch_id: int, label: str, confidence: float, overlay_path: str
 ) -> None:
-    """Save prediction to DB via PredictionService (handles DB write + cache invalidation)."""
-    from app.repositories.audit_repository import AuditRepository
+    """Save prediction to DB and invalidate cache."""
+    import redis.asyncio as aioredis
+    from fastapi_cache import FastAPICache
+    from app.domain.prediction import PredictionCreate
+    from app.infra.cache.redis_cache import _RedisBackend
     from app.repositories.prediction_repository import PredictionRepository
-    from app.services.audit_service import AuditService
-    from app.services.cache_service import CacheService
-    from app.services.prediction_service import PredictionService
+
+    # Reinitialize cache with a fresh Redis client bound to this event loop.
+    # The client from _init_cache() belongs to the parent process's event loop
+    # and deadlocks when used in the forked work-horse process.
+    r = aioredis.from_url(settings.REDIS_URL)
+    FastAPICache.init(_RedisBackend(r), prefix="docclass")
 
     session_factory, engine = _make_session()
     async with session_factory() as session:
-        prediction_service = PredictionService(
-            prediction_repo=PredictionRepository(session),
-            cache_service=CacheService(),
-            audit_service=AuditService(
-                audit_repository=AuditRepository(session)
-            ),
-        )
-        await prediction_service.create(
+        repo = PredictionRepository(session)
+        await repo.create(PredictionCreate(
             batch_id=batch_id,
             label=label,
             confidence=confidence,
             overlay_path=overlay_path,
-        )
+        ))
+        await session.commit()
     await engine.dispose()
+
+    await FastAPICache.clear()
+    await r.aclose()
 
 
 def process_job(job: dict) -> None:
