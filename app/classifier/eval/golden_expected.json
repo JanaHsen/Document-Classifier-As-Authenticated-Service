@@ -1,1 +1,242 @@
-﻿{ "_owner": "HAWRAA" }
+[
+  {
+    "filename": "img_001.tiff",
+    "label": "scientific_report",
+    "confidence": null
+  },
+  {
+    "filename": "img_002.tiff",
+    "label": "form",
+    "confidence": 0.9995443225
+  },
+  {
+    "filename": "img_003.tiff",
+    "label": "resume",
+    "confidence": 0.999968648
+  },
+  {
+    "filename": "img_004.tiff",
+    "label": "scientific_report",
+    "confidence": 0.9998283386
+  },
+  {
+    "filename": "img_005.tiff",
+    "label": "invoice",
+    "confidence": 0.9997368455
+  },
+  {
+    "filename": "img_006.tiff",
+    "label": "invoice",
+    "confidence": 0.9668562412
+  },
+  {
+    "filename": "img_007.tiff",
+    "label": "file_folder",
+    "confidence": 0.9998244643
+  },
+  {
+    "filename": "img_008.tiff",
+    "label": "form",
+    "confidence": 0.999896884
+  },
+  {
+    "filename": "img_009.tiff",
+    "label": "scientific_report",
+    "confidence": 0.998642385
+  },
+  {
+    "filename": "img_010.tiff",
+    "label": "questionnaire",
+    "confidence": 0.9996153116
+  },
+  {
+    "filename": "img_011.tiff",
+    "label": "handwritten",
+    "confidence": 0.9961593151
+  },
+  {
+    "filename": "img_012.tiff",
+    "label": "news_article",
+    "confidence": 0.9992934465
+  },
+  {
+    "filename": "img_013.tiff",
+    "label": "budget",
+    "confidence": 0.9999257326
+  },
+  {
+    "filename": "img_014.tiff",
+    "label": "file_folder",
+    "confidence": 0.9998723269
+  },
+  {
+    "filename": "img_015.tiff",
+    "label": "scientific_publication",
+    "confidence": 0.9634432793
+  },
+  {
+    "filename": "img_016.tiff",
+    "label": "presentation",
+    "confidence": 0.9972539544
+  },
+  {
+    "filename": "img_017.tiff",
+    "label": "resume",
+    "confidence": 0.9991063476
+  },
+  {
+    "filename": "img_018.tiff",
+    "label": "budget",
+    "confidence": 0.9918686152
+  },
+  {
+    "filename": "img_019.tiff",
+    "label": "budget",
+    "confidence": 0.9984740615
+  },
+  {
+    "filename": "img_020.tiff",
+    "label": "specification",
+    "confidence": 0.9629096389
+  },
+  {
+    "filename": "img_021.tiff",
+    "label": "presentation",
+    "confidence": 0.9636939764
+  },
+  {
+    "filename": "img_022.tiff",
+    "label": "handwritten",
+    "confidence": 0.9997345805
+  },
+  {
+    "filename": "img_023.tiff",
+    "label": "file_folder",
+    "confidence": 0.9991668463
+  },
+  {
+    "filename": "img_024.tiff",
+    "label": "email",
+    "confidence": 0.999963522
+  },
+  {
+    "filename": "img_025.tiff",
+    "label": "news_article",
+    "confidence": 0.9998567104
+  },
+  {
+    "filename": "img_026.tiff",
+    "label": "form",
+    "confidence": 0.9917486906
+  },
+  {
+    "filename": "img_027.tiff",
+    "label": "handwritten",
+    "confidence": 0.998984158
+  },
+  {
+    "filename": "img_028.tiff",
+    "label": "invoice",
+    "confidence": 0.999943018
+  },
+  {
+    "filename": "img_029.tiff",
+    "label": "scientific_publication",
+    "confidence": 0.9930141568
+  },
+  {
+    "filename": "img_030.tiff",
+    "label": "letter",
+    "confidence": 0.9955405593
+  },
+  {
+    "filename": "img_031.tiff",
+    "label": "advertisement",
+    "confidence": 0.9997100234
+  },
+  {
+    "filename": "img_032.tiff",
+    "label": "advertisement",
+    "confidence": 0.9481126666
+  },
+  {
+    "filename": "img_033.tiff",
+    "label": "specification",
+    "confidence": 0.9985181689
+  },
+  {
+    "filename": "img_034.tiff",
+    "label": "email",
+    "confidence": 0.9999834299
+  },
+  {
+    "filename": "img_035.tiff",
+    "label": "email",
+    "confidence": 0.9976715446
+  },
+  {
+    "filename": "img_036.tiff",
+    "label": "memo",
+    "confidence": null
+  },
+  {
+    "filename": "img_037.tiff",
+    "label": "scientific_publication",
+    "confidence": 0.9954516292
+  },
+  {
+    "filename": "img_038.tiff",
+    "label": "news_article",
+    "confidence": 0.9999394417
+  },
+  {
+    "filename": "img_039.tiff",
+    "label": "memo",
+    "confidence": 0.9993215799
+  },
+  {
+    "filename": "img_040.tiff",
+    "label": "specification",
+    "confidence": 0.9998941422
+  },
+  {
+    "filename": "img_041.tiff",
+    "label": "letter",
+    "confidence": 0.996917367
+  },
+  {
+    "filename": "img_042.tiff",
+    "label": "letter",
+    "confidence": 0.9988629818
+  },
+  {
+    "filename": "img_043.tiff",
+    "label": "memo",
+    "confidence": 0.9922935963
+  },
+  {
+    "filename": "img_044.tiff",
+    "label": "resume",
+    "confidence": null
+  },
+  {
+    "filename": "img_045.tiff",
+    "label": "advertisement",
+    "confidence": null
+  },
+  {
+    "filename": "img_046.tiff",
+    "label": "presentation",
+    "confidence": 0.9047444463
+  },
+  {
+    "filename": "img_047.tiff",
+    "label": "questionnaire",
+    "confidence": 0.9998452663
+  },
+  {
+    "filename": "img_048.tiff",
+    "label": "questionnaire",
+    "confidence": 0.9998422861
+  }
+]

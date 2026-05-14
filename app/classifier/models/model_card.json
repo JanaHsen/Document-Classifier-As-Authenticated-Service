@@ -1,1 +1,36 @@
-﻿{ "_owner": "HAWRAA" }
+{
+  "_owner": "HAWRAA",
+  "backbone": "convnext_tiny",
+  "weights_enum": "ConvNeXt_Tiny_Weights.IMAGENET1K_V1",
+  "freeze_policy": "full_fine_tune",
+  "sha256": "472a553b79033096be04eeefc0011a6e3c6dab430b7ae5e252410a775742f7cb",
+  "test_top1": 0.9001,
+  "test_top5": 0.9861,
+  "per_class_accuracy": {
+    "letter": 0.8804,
+    "form": 0.839,
+    "email": 0.9836,
+    "handwritten": 0.9587,
+    "advertisement": 0.9201,
+    "scientific_report": 0.7913,
+    "scientific_publication": 0.9186,
+    "specification": 0.9209,
+    "file_folder": 0.9486,
+    "news_article": 0.9101,
+    "budget": 0.8968,
+    "invoice": 0.9124,
+    "presentation": 0.8079,
+    "questionnaire": 0.8379,
+    "resume": 0.9522,
+    "memo": 0.9199
+  },
+  "worst_class": "scientific_report",
+  "min_accuracy_threshold": 0.85,
+  "training_epochs": 5,
+  "best_epoch": 5,
+  "environment": {
+    "python": "3.12.13",
+    "torch": "2.10.0+cu128",
+    "torchvision": "0.25.0+cu128"
+  }
+}
