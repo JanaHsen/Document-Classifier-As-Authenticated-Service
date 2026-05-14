@@ -47,6 +47,9 @@ jobs:
         timeout-minutes: 10
       - name: Check API is reachable
         run: curl -f http://localhost:8000/docs
+      - name: Dump API logs on failure
+        if: failure()
+        run: docker compose logs api
       - name: Tear down
         if: always()
         run: docker compose down -v
