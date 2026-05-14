@@ -17,7 +17,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # Custom fields
-    role: Mapped[Role] = mapped_column(SQLEnum(Role), nullable=False)
+    role: Mapped[Role] = mapped_column(SQLEnum(Role, values_callable=lambda x: [e.value for e in x]), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
     )
@@ -37,7 +37,7 @@ class Batch(Base):
     __tablename__ = "batches"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    state: Mapped[BatchStatus] = mapped_column(SQLEnum(BatchStatus), nullable=False)
+    state: Mapped[BatchStatus] = mapped_column(SQLEnum(BatchStatus, values_callable=lambda x: [e.value for e in x]), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
     )
@@ -91,7 +91,7 @@ class AuditLog(Base):
     actor_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
-    action: Mapped[AuditAction] = mapped_column(SQLEnum(AuditAction), nullable=False)
+    action: Mapped[AuditAction] = mapped_column(SQLEnum(AuditAction, values_callable=lambda x: [e.value for e in x]), nullable=False)
     target_type: Mapped[str] = mapped_column(String(50), nullable=False)
     target_id: Mapped[int] = mapped_column(Integer, nullable=False)
     old_value: Mapped[dict | None] = mapped_column(JSON, nullable=True)
