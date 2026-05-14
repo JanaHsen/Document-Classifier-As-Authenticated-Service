@@ -1,1 +1,15 @@
 ﻿# Owner: HADI
+
+
+.venv/
+__pycache__/
+
+.vscode/
+.kilo/
+.pytest_cache/
+
+tests/
+
+.gitignore
+venv/
+test_*
