@@ -3,7 +3,7 @@
   "backbone": "convnext_tiny",
   "weights_enum": "ConvNeXt_Tiny_Weights.IMAGENET1K_V1",
   "freeze_policy": "full_fine_tune",
-  "sha256": "338928d6edfc262c2215cfe0cd8427b8d071a9b0905fe627c7f2f70becf0cf30",
+  "sha256": "472a553b79033096be04eeefc0011a6e3c6dab430b7ae5e252410a775742f7cb",
   "test_top1": 0.9001,
   "test_top5": 0.9861,
   "per_class_accuracy": {
