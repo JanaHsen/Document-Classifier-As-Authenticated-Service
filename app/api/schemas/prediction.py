@@ -26,7 +26,6 @@ as the source of truth.
 """
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,8 +43,8 @@ class PredictionRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
-    batch_id: UUID
+    id: int
+    batch_id: int
     label: str
     confidence: float
     created_at: datetime

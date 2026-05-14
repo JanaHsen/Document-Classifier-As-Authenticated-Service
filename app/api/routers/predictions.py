@@ -22,7 +22,6 @@ user object. PATCH puts the user in the parameter list because the
 service needs it to record the actor in the audit log.
 """
 
-from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
@@ -69,7 +68,7 @@ async def get_recent_predictions(
     summary="Relabel a low-confidence prediction (reviewer only)",
 )
 async def relabel_prediction(
-    pid: UUID,
+    pid: int,
     body: RelabelRequest,
     reviewer: User = Depends(require_permission("predictions", "relabel")),
     prediction_service: PredictionService = Depends(get_prediction_service),

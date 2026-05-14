@@ -1,18 +1,14 @@
-from enum import Enum
-from uuid import UUID
-
 from fastapi_users import schemas
+from app.core.constants import Role
 
-class Role(str, Enum):
-    ADMIN = "admin"
-    REVIEWER = "reviewer"
-    AUDITOR = "auditor"
 
-class UserRead(schemas.BaseUser[UUID]):
+class UserRead(schemas.BaseUser[int]):
     role: Role
+
 
 class UserCreate(schemas.BaseUserCreate):
     pass
 
+
 class UserUpdate(schemas.BaseUserUpdate):
-    pass
+    role: Role | None = None

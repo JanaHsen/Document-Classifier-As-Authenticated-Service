@@ -24,7 +24,6 @@ Why dependencies=[...] and not a User parameter:
   401/403 — the only difference is that the User isn't passed in.
 """
 
-from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
@@ -72,7 +71,7 @@ async def list_batches(
     dependencies=[Depends(require_permission("batches", "read"))],
 )
 async def get_batch(
-    bid: UUID,
+    bid: int,
     batch_service: BatchService = Depends(get_batch_service),
 ):
     """

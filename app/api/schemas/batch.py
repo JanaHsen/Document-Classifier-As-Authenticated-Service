@@ -27,7 +27,6 @@ a requirement.
 
 from datetime import datetime
 from enum import Enum
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -61,7 +60,7 @@ class BatchRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
+    id: int
     created_at: datetime
     status: BatchStatus
     file_count: int

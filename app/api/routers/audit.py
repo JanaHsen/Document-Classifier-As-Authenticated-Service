@@ -1,7 +1,7 @@
 """
 Audit log routes.
 
-One endpoint from Card 7:
+One endpoint:
   GET /audit-log — list audit entries (admin + auditor only)
 
 Reviewers do NOT have audit_log:read in the seeded policy table —
@@ -26,7 +26,6 @@ the user object — only the role gate matters here.
 """
 
 from typing import Optional
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
@@ -45,7 +44,7 @@ router = APIRouter()
     dependencies=[Depends(require_permission("audit_log", "read"))],
 )
 async def list_audit_entries(
-    actor: Optional[UUID] = Query(
+    actor: Optional[int] = Query(
         None,
         description="Filter to entries created by this actor user id.",
     ),

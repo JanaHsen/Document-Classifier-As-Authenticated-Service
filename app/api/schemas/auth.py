@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
-from app.api.schemas.user import Role
+from app.core.constants import Role
 
 
 class RoleToggleRequest(BaseModel):
