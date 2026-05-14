@@ -78,9 +78,9 @@ def _poll_for_complete_batch(token: str, deadline: float) -> dict:
         assert r.status_code == 200, f"GET /batches failed: {r.text}"
         batches = r.json()
         for batch in batches:
-            if batch["state"] == "complete":
+            if batch["status"] == "complete":
                 return batch
-            if batch["state"] == "failed":
+            if batch["status"] == "failed":
                 pytest.fail(f"Batch {batch['id']} reached FAILED state")
         time.sleep(5)
     pytest.fail(f"No batch reached COMPLETE within {TIMEOUT}s")
