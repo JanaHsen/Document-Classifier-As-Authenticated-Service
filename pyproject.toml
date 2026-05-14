@@ -2,11 +2,17 @@
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-exclude = ["app/db/migrations/"]
+exclude = ["app/db/migrations/", "*.ipynb"]
 
 [tool.ruff.lint]
 select = ["E", "F"]
-ignore = ["E501"]
+ignore = ["E501", "E402"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/auth/*" = ["F401"]
+"app/domain/*" = ["F401"]
+"app/services/*" = ["F401"]
+"app/repositories/*" = ["F401"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

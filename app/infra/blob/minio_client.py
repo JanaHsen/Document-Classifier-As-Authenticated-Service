@@ -1,9 +1,9 @@
 # Owner: HADI
 import tempfile
 
-from minio import Minio
-from minio.error import S3Error
 from functools import lru_cache
+
+from minio import Minio
 
 from app.core.config import settings
 
