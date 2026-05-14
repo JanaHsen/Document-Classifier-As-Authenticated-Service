@@ -54,3 +54,18 @@ class AuditRepository:
         audits = result.scalars().all()
         return [AuditLogInDB.model_validate(a) for a in audits]
 
+    async def list_entries(
+        self, actor_id: int | None = None, action: str | None = None, limit: int = 100
+    ) -> Sequence[AuditLogInDB]:
+        """Get audit logs with optional filters."""
+        stmt = select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(limit)
+
+        if actor_id is not None:
+            stmt = stmt.where(AuditLog.actor_id == actor_id)
+        if action is not None:
+            stmt = stmt.where(AuditLog.action == action)
+
+        result = await self.session.execute(stmt)
+        audits = result.scalars().all()
+        return [AuditLogInDB.model_validate(a) for a in audits]
+
