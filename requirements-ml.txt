@@ -1,0 +1,7 @@
+# Minimal requirements for golden-set CI test and inference worker
+# Does not include web framework or database dependencies
+torch>=2.4
+torchvision>=0.19
+Pillow
+pydantic>=2.0.0
+python-json-logger>=2.0.0

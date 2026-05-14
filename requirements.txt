@@ -3,10 +3,10 @@
 # ── API ────────────────────────────────────────────────────────────────────────
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+python-multipart==0.0.9
 
 # ── Auth (Jana) ────────────────────────────────────────────────────────────────
-fastapi-users[sqlalchemy]>=10.0.0
+fastapi-users[sqlalchemy]==13.0.0
 casbin
 casbin-sqlalchemy-adapter
 python-jose[cryptography]==3.3.0
