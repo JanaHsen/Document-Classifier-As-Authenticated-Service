@@ -1,17 +1,17 @@
 # MOCK: Tarek's prediction service + PredictionRepository
 #
 # REPLACE WITH when merging:
-#   from app.services.prediction_service import save_prediction
-#   from app.db.session import get_db
+#   PredictionService.create() from app.services.prediction_service
 #
-# What the real implementation must do:
-#   save_prediction(prediction) -> None:
-#       opens a DB session, calls PredictionRepository.create(prediction),
-#       commits the transaction
-#       prediction fields per CONTRACTS.md:
-#           batch_id, filename, predicted_label, confidence, overlay_path
+# What the real swap requires (NOT a one-line swap):
+#   - PredictionService.create() is async — worker must use asyncio.run() or be refactored async
+#   - Requires injected dependencies: PredictionRepository, CacheService, AuditService
+#   - Outside FastAPI's request context, these must be wired up manually with a DB session
+#   - Signature: create(batch_id, label, confidence, overlay_path) — no filename parameter
+#   - Cache invalidation (invalidate_predictions_recent + invalidate_batch_detail) happens
+#     inside create() automatically — remove the separate Step 6 invalidate_batch call
 #
-# Note: cache invalidation is NOT done here — it lives in the service layer (Tarek's)
+# Note: filename is intentionally excluded — Tarek's DB Prediction model has no filename column
 
 import json
 from pathlib import Path
@@ -29,11 +29,10 @@ def save_prediction(prediction) -> None:
             existing = json.load(f)
 
     existing.append({
-        "batch_id":       prediction.batch_id,
-        "filename":       prediction.filename,
-        "predicted_label": prediction.predicted_label,
-        "confidence":     prediction.confidence,
-        "overlay_path":   prediction.overlay_path,
+        "batch_id":     prediction.batch_id,
+        "label":        prediction.label,
+        "confidence":   prediction.confidence,
+        "overlay_path": prediction.overlay_path,
     })
 
     with open(MOCK_DB_PATH, "w") as f:

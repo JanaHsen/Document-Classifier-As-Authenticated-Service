@@ -1,15 +1,12 @@
 # MOCK: Tarek's cache service
 #
-# REPLACE WITH when merging:
-#   from app.services.cache_service import invalidate_batch
+# NOTE: when swapping to real services, do NOT replace this with a direct CacheService call.
+# Cache invalidation is handled automatically inside PredictionService.create():
+#   await self.cache_service.invalidate_predictions_recent()
+#   await self.cache_service.invalidate_batch_detail(batch_id)
 #
-# What the real implementation must do:
-#   invalidate_batch(batch_id) -> None:
-#       invalidates the Redis cache keys for:
-#           GET /batches
-#           GET /batches/{batch_id}
-#           GET /predictions/recent
-#       per CONTRACTS.md cache invalidation rules
+# The correct swap is to remove Step 6 in inference_worker.py entirely once Step 5
+# is wired to the real PredictionService.create().
 
 
 def invalidate_batch(batch_id: int) -> None:

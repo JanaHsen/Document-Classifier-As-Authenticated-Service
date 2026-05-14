@@ -75,10 +75,13 @@ def process_job(job: dict) -> None:
     upload_overlay(local_overlay, overlay_path)
 
     # Step 5: save prediction to DB via service layer
-    prediction = format_prediction(batch_id, filename, result.label, result.confidence, overlay_path)
+    prediction = format_prediction(batch_id, result.label, result.confidence, overlay_path)
     save_prediction(prediction)
 
     # Step 6: invalidate cache via service layer
+    # NOTE: when swapping Step 5 to the real PredictionService.create(), cache invalidation
+    # (invalidate_predictions_recent + invalidate_batch_detail) already happens inside create().
+    # Remove this step entirely when doing the real integration.
     invalidate_batch(batch_id)
 
     _log("INFO", "job complete", request_id=request_id, batch_id=batch_id)
