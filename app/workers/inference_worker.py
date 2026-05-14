@@ -9,7 +9,6 @@ from pathlib import Path
 import torch
 
 from app.classifier.inference.overlays import generate_overlay
-from app.classifier.inference.postprocessing import format_prediction
 from app.classifier.inference.predictor import load_model, predict
 from app.core.config import settings
 from app.infra.blob.minio_client import download_tiff, upload_overlay
