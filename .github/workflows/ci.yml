@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-ml.txt
       - name: Run golden set evaluation
-        run: python app/classifier/eval/golden.py
+        run: PYTHONPATH=. python app/classifier/eval/golden.py
 
   compose-smoke:
     runs-on: ubuntu-latest
