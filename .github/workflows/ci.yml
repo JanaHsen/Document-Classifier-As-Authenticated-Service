@@ -48,7 +48,7 @@ jobs:
       - name: Check API is reachable
         run: curl -f http://localhost:8000/docs
       - name: Install smoke test dependencies
-        run: pip install httpx paramiko pytest
+        run: pip install httpx paramiko pytest pytest-timeout
       - name: Run smoke tests
         run: PYTHONPATH=. pytest tests/smoke/ -v --timeout=180
       - name: Dump API logs on failure
