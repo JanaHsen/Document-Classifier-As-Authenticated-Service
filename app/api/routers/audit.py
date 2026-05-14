@@ -52,7 +52,7 @@ async def list_audit_entries(
         None,
         description=(
             "Filter to entries with this exact action string "
-            "(e.g., 'users.role.toggle', 'predictions.relabel')."
+            "(e.g., 'change_role', 'relabel_pred', 'change_state')."
         ),
     ),
     audit_service: AuditService = Depends(get_audit_service),

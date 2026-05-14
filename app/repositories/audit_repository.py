@@ -27,6 +27,8 @@ class AuditRepository:
             action=data.action,
             target_type=data.target_type,
             target_id=data.target_id,
+            old_value=data.old_value,
+            new_value=data.new_value,
         )
         self.session.add(audit_log)
         await self.session.flush()

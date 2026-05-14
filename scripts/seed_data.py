@@ -32,7 +32,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.base import Base
 from app.db.models import User, Batch, Prediction, AuditLog
-from app.core.constants import Role, BatchStatus
+from app.core.constants import Role, BatchStatus, AuditAction
 from app.core.config import settings
 
 # Import bcrypt for password hashing
@@ -229,9 +229,11 @@ async def seed_audit_logs(
     # Role change audit
     logs.append(AuditLog(
         actor_id=admin.id,
-        action="role_change: reviewer -> reviewer",
+        action=AuditAction.CHANGE_ROLE,
         target_type="user",
         target_id=reviewer.id,
+        old_value={"role": "reviewer"},
+        new_value={"role": "reviewer"},
         timestamp=datetime.utcnow() - timedelta(days=4),
     ))
 
@@ -239,9 +241,11 @@ async def seed_audit_logs(
     for batch_id, batch in batches.items():
         logs.append(AuditLog(
             actor_id=admin.id,
-            action=f"batch_state_change: pending -> {batch.state.value}",
+            action=AuditAction.CHANGE_STATE,
             target_type="batch",
             target_id=batch.id,
+            old_value={"state": "pending"},
+            new_value={"state": batch.state.value},
             timestamp=batch.created_at,
         ))
 
@@ -251,9 +255,11 @@ async def seed_audit_logs(
         new_label = pred.label
         logs.append(AuditLog(
             actor_id=reviewer.id,
-            action=f"relabel: {old_label} -> {new_label}",
+            action=AuditAction.RELABEL_PRED,
             target_type="prediction",
             target_id=pred.id,
+            old_value={"label": old_label},
+            new_value={"label": new_label},
             timestamp=pred.created_at + timedelta(minutes=5),
         ))
 

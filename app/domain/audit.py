@@ -6,14 +6,18 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.types import PositiveInt
 
+from app.core.constants import AuditAction
+
 
 class AuditLogBase(BaseModel):
     """Base audit log schema."""
 
     actor_id: int = Field(..., description="ID of the user who performed the action")
-    action: str = Field(..., max_length=100, description="Action performed")
+    action: AuditAction = Field(..., description="Action performed")
     target_type: str = Field(..., max_length=50, description="Type of target entity")
     target_id: int = Field(..., description="ID of the affected record")
+    old_value: Optional[dict] = Field(default=None, description="Value before the change")
+    new_value: Optional[dict] = Field(default=None, description="Value after the change")
 
 
 class AuditLogCreate(AuditLogBase):

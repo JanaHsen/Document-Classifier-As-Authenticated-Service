@@ -63,13 +63,22 @@ def upgrade() -> None:
     op.create_index("ix_predictions_batch_created", "predictions", ["batch_id", "created_at"])
 
     # Create audit_logs table
+    # Drop enum if it exists from a previous failed migration (idempotency)
+    op.execute("DROP TYPE IF EXISTS auditaction")
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
         sa.Column("actor_id", sa.Integer, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=False, index=True),
-        sa.Column("action", sa.String(100), nullable=False, index=True),
+        sa.Column(
+            "action",
+            sa.Enum("change_role", "relabel_pred", "change_state", name="auditaction"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("target_type", sa.String(50), nullable=False),
         sa.Column("target_id", sa.Integer, nullable=False),
+        sa.Column("old_value", postgresql.JSONB, nullable=True),
+        sa.Column("new_value", postgresql.JSONB, nullable=True),
         sa.Column("timestamp", sa.DateTime, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP"), index=True),
     )
     # Indices for columns without inline index=True
@@ -86,5 +95,6 @@ def downgrade() -> None:
     op.drop_table("batches")
     op.drop_table("users")
     # Drop ENUM types
+    op.execute("DROP TYPE IF EXISTS auditaction")
     op.execute("DROP TYPE IF EXISTS role")
     op.execute("DROP TYPE IF EXISTS batchstatus")

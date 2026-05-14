@@ -1,10 +1,10 @@
 ﻿from datetime import datetime
 
-from sqlalchemy import Integer, String, Float, DateTime, ForeignKey, Index, Enum as SQLEnum
+from sqlalchemy import Integer, String, Float, DateTime, ForeignKey, Index, Enum as SQLEnum, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
-from app.core.constants import BatchStatus, Role
+from app.core.constants import BatchStatus, Role, AuditAction
 from fastapi_users.db import SQLAlchemyBaseUserTable
 
 
@@ -91,9 +91,11 @@ class AuditLog(Base):
     actor_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False
     )
-    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    action: Mapped[AuditAction] = mapped_column(SQLEnum(AuditAction), nullable=False)
     target_type: Mapped[str] = mapped_column(String(50), nullable=False)
     target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    old_value: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    new_value: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
     )
