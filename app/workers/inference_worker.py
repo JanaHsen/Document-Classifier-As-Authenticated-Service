@@ -26,30 +26,40 @@ def _log(level: str, message: str, **kwargs) -> None:
     print(json.dumps(record))
 
 
+def _make_session():
+    """Fresh async session with NullPool — safe for repeated asyncio.run() calls in the worker."""
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    return sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False), engine
+
+
 async def _update_batch_state(batch_id: int, state: BatchStatus) -> None:
     """Update batch state directly via repository (no actor — system-initiated)."""
-    from app.db.session import AsyncSessionLocal
     from app.domain.batch import BatchUpdate
     from app.repositories.batch_repository import BatchRepository
 
-    async with AsyncSessionLocal() as session:
+    session_factory, engine = _make_session()
+    async with session_factory() as session:
         repo = BatchRepository(session)
         await repo.update_state(batch_id, BatchUpdate(state=state))
         await session.commit()
+    await engine.dispose()
 
 
 async def _save_prediction(
     batch_id: int, label: str, confidence: float, overlay_path: str
 ) -> None:
     """Save prediction to DB via PredictionService (handles DB write + cache invalidation)."""
-    from app.db.session import AsyncSessionLocal
     from app.repositories.audit_repository import AuditRepository
     from app.repositories.prediction_repository import PredictionRepository
     from app.services.audit_service import AuditService
     from app.services.cache_service import CacheService
     from app.services.prediction_service import PredictionService
 
-    async with AsyncSessionLocal() as session:
+    session_factory, engine = _make_session()
+    async with session_factory() as session:
         prediction_service = PredictionService(
             prediction_repo=PredictionRepository(session),
             cache_service=CacheService(),
@@ -63,6 +73,7 @@ async def _save_prediction(
             confidence=confidence,
             overlay_path=overlay_path,
         )
+    await engine.dispose()
 
 
 def process_job(job: dict) -> None:

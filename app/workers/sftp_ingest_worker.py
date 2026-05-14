@@ -27,15 +27,21 @@ BATCH_WINDOW_SECONDS = 30
 
 async def _create_batch() -> int:
     """Create a new PENDING batch in the DB and return its ID."""
-    from app.db.session import AsyncSessionLocal
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
     from app.domain.batch import BatchCreate
     from app.repositories.batch_repository import BatchRepository
 
-    async with AsyncSessionLocal() as session:
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    session_factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    async with session_factory() as session:
         repo = BatchRepository(session)
         batch = await repo.create(BatchCreate())
         await session.commit()
-        return batch.id
+        batch_id = batch.id
+    await engine.dispose()
+    return batch_id
 
 
 def _download_from_sftp(remote_path: str) -> str:
