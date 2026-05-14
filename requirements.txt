@@ -6,7 +6,7 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # ── Auth (Jana) ────────────────────────────────────────────────────────────────
-fastapi-users[sqlalchemy]==6.1.3
+fastapi-users[sqlalchemy]>=10.0.0
 casbin
 casbin-sqlalchemy-adapter
 python-jose[cryptography]==3.3.0
