@@ -6,9 +6,11 @@ Handles business logic for prediction operations.
 from typing import List
 
 from fastapi import HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 
 from app.domain.prediction import PredictionOut, PredictionCreate, PredictionUpdate
 from app.exceptions import NotFoundError
+from app.infra.blob.minio_client import download_overlay
 from app.repositories.prediction_repository import PredictionRepository
 from app.services.audit_service import AuditService
 from app.services.cache_service import CacheService
@@ -31,6 +33,39 @@ class PredictionService:
         """Get most recent predictions."""
         predictions = await self.prediction_repo.get_recent(limit)
         return [PredictionOut.model_validate(p) for p in predictions]
+
+    async def get_overlay(self, prediction_id: int) -> bytes:
+        """
+        Return the annotated overlay PNG bytes for a prediction.
+
+        Read-only artifact access: no cache invalidation, no audit
+        log (consistent with the architectural rule that those side
+        effects belong to state-changing operations only).
+
+        Raises 404 if the prediction does not exist or its overlay
+        object is missing from blob storage. The blocking MinIO read
+        runs in a threadpool so it does not stall the event loop.
+        """
+        try:
+            prediction = await self.prediction_repo.get_by_id(prediction_id)
+        except NotFoundError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Prediction with id '{prediction_id}' not found",
+            )
+
+        try:
+            return await run_in_threadpool(
+                download_overlay, prediction.overlay_path
+            )
+        except NotFoundError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"Overlay for prediction '{prediction_id}' is not "
+                    "available in storage"
+                ),
+            )
 
     async def create(
         self,

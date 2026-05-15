@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Document Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ---- Heritage design system (design-md-framer) hardened with taste-skill rules ---- */
+  :root {
+    --ink: #1A1C1E;          /* headlines, core text (never pure #000) */
+    --slate: #6C7278;        /* borders, captions, metadata */
+    --clay: #B8422E;         /* the single accent — drives interaction */
+    --clay-press: #9c3322;
+    --limestone: #F7F5F2;    /* warm canvas, softer than white */
+    --surface: #FFFFFF;
+    --line: rgba(26, 28, 30, 0.10);
+    --line-soft: rgba(26, 28, 30, 0.06);
+
+    --ok-bg: #EDF3EC; --ok-fg: #346538;
+    --warn-bg: #FBF3DB; --warn-fg: #956400;
+    --bad-bg: #FDEBEC; --bad-fg: #9F2F2D;
+    --info-bg: #E1F3FE; --info-fg: #1F6C9F;
+
+    --r-sm: 4px;
+    --r-md: 8px;
+    --sans: "Public Sans", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono: "Space Grotesk", ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100dvh; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--limestone);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* warm radial depth, fixed + pointer-none (perf guardrail) */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(60vw 60vw at 82% -8%, rgba(184, 66, 46, 0.05), transparent 70%),
+      radial-gradient(48vw 48vw at -6% 104%, rgba(26, 28, 30, 0.035), transparent 70%);
+  }
+  #root { position: relative; z-index: 1; }
+
+  a { color: inherit; }
+  button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  input, select { font: inherit; color: inherit; }
+
+  .label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--slate);
+  }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--slate); }
+
+  /* ---- entry motion: invisible-but-present (minimalist-skill) ---- */
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .rise { animation: rise 560ms var(--ease) both; }
+  .stagger > * { animation: rise 560ms var(--ease) both; animation-delay: calc(var(--i, 0) * 55ms); }
+  @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+
+  /* ---- buttons ---- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px; border-radius: var(--r-sm);
+    background: var(--ink); color: var(--limestone);
+    font-weight: 600; font-size: 0.92rem;
+    transition: background .18s var(--ease), transform .12s var(--ease);
+  }
+  .btn:hover { background: #2c2f31; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .btn--accent { background: var(--clay); }
+  .btn--accent:hover { background: var(--clay-press); }
+  .btn--ghost {
+    background: transparent; color: var(--ink);
+    border: 1px solid var(--line); padding: 9px 15px;
+  }
+  .btn--ghost:hover { background: rgba(26,28,30,0.04); }
+  .btn--sm { padding: 7px 13px; font-size: 0.84rem; }
+
+  .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  .field input, .field select {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: 12px 14px; font-size: 0.95rem;
+    transition: border-color .18s var(--ease);
+  }
+  .field input:focus, .field select:focus,
+  .btn:focus-visible, .tab:focus-visible {
+    outline: none; border-color: var(--clay);
+    box-shadow: 0 0 0 3px rgba(184, 66, 46, 0.16);
+  }
+  .field .err { font-size: 0.82rem; color: var(--bad-fg); min-height: 1px; }
+
+  /* ---- auth screen: split, left-aligned (anti-center bias) ---- */
+  .auth { min-height: 100dvh; display: grid; grid-template-columns: 1.05fr 1fr; }
+  .auth__brand {
+    padding: 8vh 6vw; display: flex; flex-direction: column; justify-content: space-between;
+    background: var(--ink); color: var(--limestone);
+  }
+  .auth__brand h1 {
+    font-size: clamp(2.4rem, 4.4vw, 3.6rem); font-weight: 700;
+    letter-spacing: -0.03em; line-height: 1.04; margin: 28px 0 18px;
+  }
+  .auth__brand p { color: #b9bcbf; max-width: 42ch; }
+  .auth__brand .pipe {
+    font-family: var(--mono); font-size: 0.78rem; color: #80878d;
+    line-height: 2.1; letter-spacing: 0.02em;
+  }
+  .auth__brand .pipe b { color: var(--clay); font-weight: 600; }
+  .auth__form { padding: 8vh 6vw; display: flex; flex-direction: column; justify-content: center; }
+  .auth__form .inner { width: 100%; max-width: 380px; }
+  .auth__tabs { display: flex; gap: 24px; margin-bottom: 30px; }
+  .auth__tab {
+    font-weight: 600; color: var(--slate); padding-bottom: 8px;
+    border-bottom: 2px solid transparent; transition: color .18s, border-color .18s;
+  }
+  .auth__tab[aria-selected="true"] { color: var(--ink); border-color: var(--clay); }
+  .mark {
+    width: 34px; height: 34px; border-radius: var(--r-sm);
+    background: var(--clay); display: grid; place-items: center;
+  }
+  .mark span { width: 13px; height: 13px; border: 2px solid var(--limestone); border-radius: 2px; }
+
+  /* ---- app shell ---- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px clamp(20px, 4vw, 48px);
+    background: rgba(247, 245, 242, 0.82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar__brand { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: -0.01em; }
+  .topbar__right { display: flex; align-items: center; gap: 16px; }
+  .userchip { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+  .userchip .who { font-weight: 600; font-size: 0.9rem; }
+
+  .badge {
+    display: inline-flex; align-items: center;
+    font-family: var(--mono); font-size: 0.68rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 9999px;
+    background: var(--info-bg); color: var(--info-fg);
+  }
+  .badge--pending { background: var(--limestone); color: var(--slate); border: 1px solid var(--line); }
+  .badge--processing { background: var(--warn-bg); color: var(--warn-fg); }
+  .badge--complete { background: var(--ok-bg); color: var(--ok-fg); }
+  .badge--failed { background: var(--bad-bg); color: var(--bad-fg); }
+  .badge--role { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: clamp(28px, 5vw, 56px) clamp(20px, 4vw, 48px); }
+  .nav { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 36px; }
+  .tab {
+    padding: 12px 18px; font-weight: 600; color: var(--slate);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color .18s var(--ease), border-color .18s var(--ease);
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--ink); border-color: var(--clay); }
+
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+  .head h2 { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; }
+  .head p { color: var(--slate); font-size: 0.92rem; margin-top: 4px; }
+
+  /* ---- data table: 1px lines, no boxed cards (dashboard hardening) ---- */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; padding: 13px 18px;
+    font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--slate);
+    border-bottom: 1px solid var(--line); background: var(--limestone);
+  }
+  tbody td { padding: 15px 18px; border-bottom: 1px solid var(--line-soft); font-size: 0.92rem; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.clickable { cursor: pointer; transition: background .15s var(--ease); }
+  tbody tr.clickable:hover { background: rgba(26,28,30,0.025); }
+  td .num { font-family: var(--mono); }
+
+  .conf { display: flex; align-items: center; gap: 10px; min-width: 130px; }
+  .conf .track { flex: 1; height: 5px; border-radius: 9999px; background: var(--line); overflow: hidden; }
+  .conf .fill { height: 100%; background: var(--ink); border-radius: 9999px; }
+  .conf.low .fill { background: var(--clay); }
+  .conf .pct { font-family: var(--mono); font-size: 0.82rem; width: 46px; text-align: right; }
+
+  /* ---- skeleton loader (matches table rhythm) ---- */
+  @keyframes shimmer { 100% { background-position: -200% 0; } }
+  .sk {
+    height: 12px; border-radius: 3px;
+    background: linear-gradient(90deg, var(--line-soft) 0%, rgba(26,28,30,0.10) 50%, var(--line-soft) 100%);
+    background-size: 200% 100%; animation: shimmer 1.25s linear infinite;
+  }
+
+  .empty { text-align: center; padding: 64px 24px; }
+  .empty .ring {
+    width: 46px; height: 46px; margin: 0 auto 18px; border-radius: 9999px;
+    border: 1.5px dashed var(--slate); opacity: .6;
+  }
+  .empty h3 { font-weight: 600; margin-bottom: 6px; }
+  .empty p { color: var(--slate); font-size: 0.9rem; max-width: 42ch; margin: 0 auto; }
+
+  .note { padding: 14px 16px; border-radius: var(--r-sm); font-size: 0.88rem; }
+  .note--err { background: var(--bad-bg); color: var(--bad-fg); }
+  .note--ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .note--info { background: var(--info-bg); color: var(--info-fg); }
+
+  .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 22px; }
+  .filters .field { margin-bottom: 0; }
+  .filters input, .filters select { min-width: 170px; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 28px; }
+  .grid-2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; align-items: start; }
+  .kv { display: grid; grid-template-columns: 130px 1fr; gap: 10px 16px; font-size: 0.92rem; }
+  .kv dt { color: var(--slate); }
+  .kv dd { font-family: var(--mono); word-break: break-all; }
+
+  /* ---- modal-ish detail (overlay) ---- */
+  .overlay { position: fixed; inset: 0; z-index: 40; background: rgba(26,28,30,0.42); display: grid; place-items: center; padding: 24px; animation: rise .2s var(--ease) both; }
+  .sheet { background: var(--surface); border-radius: var(--r-md); border: 1px solid var(--line); width: 100%; max-width: 520px; padding: 30px; }
+  .sheet .x { position: absolute; }
+
+  @media (max-width: 860px) {
+    .auth { grid-template-columns: 1fr; }
+    .auth__brand { display: none; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .topbar { padding: 12px 18px; }
+    .wrap { padding: 26px 18px; }
+    table { font-size: 0.86rem; }
+    thead th, tbody td { padding: 11px 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Document Classifier — single-file client (no build step).
+   Served same-origin by FastAPI, so API base is "".
+   ============================================================ */
+
+const LABELS = ["letter","form","email","handwritten","advertisement","scientific_report",
+  "scientific_publication","specification","file_folder","news_article","budget","invoice",
+  "presentation","questionnaire","resume","memo"];
+const AUDIT_ACTIONS = ["change_role","relabel_pred","change_state"];
+const ROLES = ["admin","reviewer","auditor"];
+
+const store = {
+  get token() { return localStorage.getItem("dc_token"); },
+  set token(v) { v ? localStorage.setItem("dc_token", v) : localStorage.removeItem("dc_token"); },
+  me: null,
+};
+
+const $ = (sel, el = document) => el.querySelector(sel);
+const h = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v;
+    else if (k === "html") e.innerHTML = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined) e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return e;
+};
+const fmtTime = (s) => { try { return new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); } catch { return s; } };
+
+/* ---- API layer ---------------------------------------------------------- */
+class ApiError extends Error {
+  constructor(status, detail) { super(detail || `Request failed (${status})`); this.status = status; }
+}
+async function api(path, { method = "GET", body, form } = {}) {
+  const headers = {};
+  if (store.token) headers["Authorization"] = "Bearer " + store.token;
+  let payload;
+  if (form) { headers["Content-Type"] = "application/x-www-form-urlencoded"; payload = new URLSearchParams(form).toString(); }
+  else if (body !== undefined) { headers["Content-Type"] = "application/json"; payload = JSON.stringify(body); }
+
+  const res = await fetch(path, { method, headers, body: payload });
+  if (res.status === 401 && store.token) { store.token = null; store.me = null; render(); throw new ApiError(401, "Session expired — please sign in again."); }
+
+  let data = null;
+  const text = await res.text();
+  if (text) { try { data = JSON.parse(text); } catch { data = text; } }
+  if (!res.ok) {
+    let detail = `Request failed (${res.status})`;
+    if (data && typeof data === "object" && data.detail) {
+      detail = Array.isArray(data.detail) ? data.detail.map(d => d.msg || JSON.stringify(d)).join("; ") : String(data.detail);
+    } else if (typeof data === "string" && data) detail = data;
+    throw new ApiError(res.status, detail);
+  }
+  return data;
+}
+
+// Binary fetch (overlay PNGs). Same auth + 401 handling as api(),
+// but resolves to a Blob. Needed because <img src> can't carry the
+// Bearer token, so we fetch then hand the UI an object URL.
+async function apiBlob(path) {
+  const headers = {};
+  if (store.token) headers["Authorization"] = "Bearer " + store.token;
+  const res = await fetch(path, { headers });
+  if (res.status === 401 && store.token) { store.token = null; store.me = null; render(); throw new ApiError(401, "Session expired — please sign in again."); }
+  if (!res.ok) {
+    let detail = `Request failed (${res.status})`;
+    try { const j = JSON.parse(await res.text()); if (j && j.detail) detail = String(j.detail); } catch {}
+    throw new ApiError(res.status, detail);
+  }
+  return res.blob();
+}
+
+// Multipart upload. Same auth + 401 + error handling as api(); the
+// browser sets the multipart Content-Type/boundary itself, so we
+// must NOT set it manually.
+async function apiUpload(path, formData) {
+  const headers = {};
+  if (store.token) headers["Authorization"] = "Bearer " + store.token;
+  const res = await fetch(path, { method: "POST", headers, body: formData });
+  if (res.status === 401 && store.token) { store.token = null; store.me = null; render(); throw new ApiError(401, "Session expired — please sign in again."); }
+  const text = await res.text();
+  let data = null;
+  if (text) { try { data = JSON.parse(text); } catch { data = text; } }
+  if (!res.ok) {
+    let detail = `Request failed (${res.status})`;
+    if (data && typeof data === "object" && data.detail) {
+      detail = Array.isArray(data.detail) ? data.detail.map(d => d.msg || JSON.stringify(d)).join("; ") : String(data.detail);
+    } else if (typeof data === "string" && data) detail = data;
+    throw new ApiError(res.status, detail);
+  }
+  return data;
+}
+
+/* ---- shared bits -------------------------------------------------------- */
+function statusBadge(s) {
+  const k = String(s || "").toLowerCase();
+  return h("span", { class: `badge badge--${k || "pending"}` }, k || "unknown");
+}
+function confidenceCell(c) {
+  const pct = Math.round((c ?? 0) * 1000) / 10;
+  const low = c < 0.7;
+  return h("div", { class: "conf" + (low ? " low" : "") },
+    h("div", { class: "track" }, h("div", { class: "fill", style: `width:${Math.max(0, Math.min(100, pct))}%` })),
+    h("span", { class: "pct" }, pct + "%"));
+}
+function skeletonTable(cols, rows = 5) {
+  const body = h("tbody");
+  for (let r = 0; r < rows; r++) {
+    const tr = h("tr");
+    for (let c = 0; c < cols; c++) tr.append(h("td", {}, h("div", { class: "sk", style: `width:${40 + ((r + c) % 4) * 14}%` })));
+    body.append(tr);
+  }
+  return body;
+}
+function emptyState(title, msg) {
+  return h("div", { class: "empty rise" }, h("div", { class: "ring" }), h("h3", {}, title), h("p", {}, msg));
+}
+function errorNote(msg) { return h("div", { class: "note note--err rise" }, msg); }
+
+/* ---- auth screen -------------------------------------------------------- */
+function AuthView() {
+  let mode = "login"; // login | register
+  const root = h("div", { class: "auth" });
+
+  const brand = h("div", { class: "auth__brand" },
+    h("div", { class: "mark" }, h("span")),
+    h("div", {},
+      h("h1", {}, "Classify every scanned document the moment it lands."),
+      h("p", {}, "TIFF uploads arrive over SFTP, get sorted into 16 document classes by a ConvNeXt model, and surface here with confidence scores and an audit trail.")),
+    h("div", { class: "pipe", html:
+      "SFTP &rarr; <b>ingest</b> &rarr; MinIO &rarr; <b>queue</b> &rarr; ConvNeXt &rarr; <b>Postgres</b> &rarr; API" }));
+
+  const formInner = h("div", { class: "inner" });
+  root.append(brand, h("div", { class: "auth__form" }, formInner));
+
+  function paint() {
+    formInner.innerHTML = "";
+    const tabs = h("div", { class: "auth__tabs" },
+      h("button", { class: "auth__tab", "aria-selected": String(mode === "login"), onclick: () => { mode = "login"; paint(); } }, "Sign in"),
+      h("button", { class: "auth__tab", "aria-selected": String(mode === "register"), onclick: () => { mode = "register"; paint(); } }, "Create account"));
+
+    const email = h("input", { type: "email", required: "", autocomplete: "username", placeholder: "you@company.com" });
+    const pass = h("input", { type: "password", required: "", autocomplete: mode === "login" ? "current-password" : "new-password", placeholder: "••••••••" });
+    const emailErr = h("div", { class: "err" });
+    const passErr = h("div", { class: "err" });
+    const formErr = h("div", { class: "note note--err", style: "display:none;margin-bottom:18px" });
+    const submit = h("button", { class: "btn btn--accent", type: "submit", style: "width:100%;justify-content:center" },
+      mode === "login" ? "Sign in" : "Create account");
+
+    const form = h("form", { novalidate: "" },
+      formErr,
+      h("div", { class: "field" }, h("label", { class: "label", for: "em" }, "Email"), Object.assign(email, { id: "em" }), emailErr),
+      h("div", { class: "field" }, h("label", { class: "label", for: "pw" }, "Password"), Object.assign(pass, { id: "pw" }), passErr),
+      submit);
+
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      emailErr.textContent = passErr.textContent = ""; formErr.style.display = "none";
+      let bad = false;
+      if (!email.value || !email.validity.valid) { emailErr.textContent = "Enter a valid email address."; bad = true; }
+      if (!pass.value || pass.value.length < 8) { passErr.textContent = "Password must be at least 8 characters."; bad = true; }
+      if (bad) return;
+
+      submit.disabled = true; submit.textContent = mode === "login" ? "Signing in…" : "Creating…";
+      try {
+        if (mode === "register") {
+          await api("/auth/register", { method: "POST", body: { email: email.value, password: pass.value } });
+        }
+        const tok = await api("/auth/jwt/login", { method: "POST", form: { username: email.value, password: pass.value } });
+        store.token = tok.access_token;
+        store.me = await api("/users/me");
+        render();
+      } catch (e) {
+        formErr.textContent = e.status === 400 && mode === "register"
+          ? "That email is already registered, or the password is too weak."
+          : e.message;
+        formErr.style.display = "block";
+        submit.disabled = false; submit.textContent = mode === "login" ? "Sign in" : "Create account";
+      }
+    });
+
+    formInner.append(tabs, form,
+      h("p", { class: "muted", style: "font-size:.82rem;margin-top:22px" },
+        mode === "login" ? "New accounts start with the role assigned by an administrator." : "After creating an account, an admin assigns your role."));
+  }
+  paint();
+  return root;
+}
+
+/* ---- batches ------------------------------------------------------------ */
+function openUpload(onDone) {
+  const input = h("input", { type: "file", accept: ".tif,.tiff,image/tiff", multiple: "", style: "display:none" });
+  const chosen = h("div", { class: "muted", style: "font-size:.88rem;margin:12px 0" }, "No files selected.");
+  const result = h("div", {});
+  const pick = h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: () => input.click() }, iconImage(), "Choose TIFF files");
+  const submit = h("button", { class: "btn btn--accent", disabled: "", onclick: doUpload }, "Upload");
+  const close = () => ov.remove();
+  const ov = h("div", { class: "overlay", onclick: (e) => { if (e.target === ov) close(); } });
+
+  input.addEventListener("change", () => {
+    const n = input.files.length;
+    chosen.textContent = n ? Array.from(input.files).map(f => f.name).join(", ") : "No files selected.";
+    if (n) submit.removeAttribute("disabled"); else submit.setAttribute("disabled", "");
+  });
+
+  async function doUpload() {
+    if (!input.files.length) return;
+    submit.disabled = true; pick.disabled = true; submit.textContent = "Uploading…"; result.innerHTML = "";
+    const fd = new FormData();
+    Array.from(input.files).forEach(f => fd.append("files", f, f.name));
+    try {
+      const batches = await apiUpload("/batches/upload", fd);
+      result.append(h("div", { class: "note note--ok", style: "margin-top:14px" },
+        `${batches.length} batch${batches.length === 1 ? "" : "es"} queued (#${batches.map(b => b.id).join(", #")}). Classification runs in the background — refresh in a few seconds.`));
+      submit.textContent = "Done";
+      if (typeof onDone === "function") onDone();
+      setTimeout(close, 1800);
+    } catch (e) {
+      result.append(h("div", { style: "margin-top:14px" }, errorNote(e.message)));
+      submit.disabled = false; pick.disabled = false; submit.textContent = "Upload";
+    }
+  }
+
+  const sheet = h("div", { class: "sheet" },
+    h("div", { style: "display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px" },
+      h("div", {}, h("div", { class: "label" }, "Manual ingest"),
+        h("h2", { style: "font-size:1.4rem;letter-spacing:-.02em;margin-top:4px" }, "Upload documents")),
+      h("button", { class: "btn btn--ghost btn--sm", onclick: close }, "Close")),
+    h("p", { class: "muted", style: "font-size:.9rem" }, "TIFF only, up to 25 MB each. Every file becomes its own batch and runs through the same model pipeline as SFTP."),
+    input,
+    h("div", { style: "margin-top:14px" }, pick),
+    chosen, result,
+    h("div", { style: "display:flex;justify-content:flex-end;margin-top:8px" }, submit));
+  ov.append(sheet); document.body.append(ov);
+}
+
+function BatchesView() {
+  const root = h("section", { class: "rise" });
+  const panel = h("div", { class: "panel" });
+  const reload = h("button", { class: "btn btn--ghost btn--sm", onclick: load }, iconRefresh(), "Refresh");
+  const isAdmin = store.me?.role === "admin";
+  const actions = h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" },
+    isAdmin ? h("button", { class: "btn btn--sm", onclick: () => openUpload(load) }, iconUpload(), "Upload TIFF") : null,
+    reload);
+  root.append(
+    h("div", { class: "head" },
+      h("div", {}, h("h2", {}, "Batches"),
+        h("p", {}, isAdmin
+          ? "Upload documents directly, or watch SFTP-ingested batches move through the pipeline."
+          : "Every SFTP ingestion unit and where it sits in the pipeline.")),
+      actions),
+    panel);
+
+  function table(rows) {
+    const t = h("table", {},
+      h("thead", {}, h("tr", {},
+        h("th", {}, "Batch"), h("th", {}, "Status"), h("th", {}, "Files"), h("th", {}, "Created"), h("th", {}, ""))));
+    const tb = h("tbody", { class: "stagger" });
+    rows.forEach((b, i) => {
+      tb.append(h("tr", { class: "clickable", style: `--i:${i}`, onclick: () => openBatch(b.id) },
+        h("td", {}, h("span", { class: "num" }, "#" + b.id)),
+        h("td", {}, statusBadge(b.status)),
+        h("td", {}, h("span", { class: "num" }, b.file_count ?? "—")),
+        h("td", { class: "muted" }, fmtTime(b.created_at)),
+        h("td", { style: "text-align:right" }, h("span", { class: "label" }, "View"))));
+    });
+    t.append(tb);
+    return t;
+  }
+
+  async function load() {
+    panel.innerHTML = ""; reload.disabled = true;
+    const sk = h("table", {}, h("thead", {}, h("tr", {}, ["Batch","Status","Files","Created",""].map(x => h("th", {}, x)))));
+    sk.append(skeletonTable(5)); panel.append(sk);
+    try {
+      const rows = await api("/batches");
+      panel.innerHTML = "";
+      panel.append(rows.length ? table(rows) : emptyState("No batches yet", "Drop a TIFF onto the SFTP server (port 2222). The ingest worker picks it up within 5 seconds and a batch appears here."));
+    } catch (e) {
+      panel.innerHTML = ""; panel.append(h("div", { style: "padding:24px" }, errorNote(e.message)));
+    } finally { reload.disabled = false; }
+  }
+
+  async function openBatch(id) {
+    const ov = h("div", { class: "overlay", onclick: (e) => { if (e.target === ov) ov.remove(); } });
+    const sheet = h("div", { class: "sheet" }, h("div", { class: "sk", style: "width:40%;height:18px;margin-bottom:18px" }),
+      h("div", { class: "sk", style: "width:70%;margin-bottom:10px" }), h("div", { class: "sk", style: "width:55%" }));
+    ov.append(sheet); document.body.append(ov);
+    try {
+      const b = await api("/batches/" + id);
+      sheet.innerHTML = "";
+      sheet.append(
+        h("div", { style: "display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px" },
+          h("div", {}, h("div", { class: "label" }, "Batch detail"), h("h2", { style: "font-size:1.5rem;letter-spacing:-.02em;margin-top:4px" }, "#" + b.id)),
+          h("button", { class: "btn btn--ghost btn--sm", onclick: () => ov.remove() }, "Close")),
+        h("dl", { class: "kv" },
+          h("dt", {}, "Status"), h("dd", {}, statusBadge(b.status)),
+          h("dt", {}, "File count"), h("dd", {}, String(b.file_count ?? "—")),
+          h("dt", {}, "Created"), h("dd", {}, fmtTime(b.created_at))));
+    } catch (e) {
+      sheet.innerHTML = ""; sheet.append(errorNote(e.message),
+        h("button", { class: "btn btn--ghost btn--sm", style: "margin-top:16px", onclick: () => ov.remove() }, "Close"));
+    }
+  }
+
+  load();
+  return root;
+}
+
+/* ---- predictions -------------------------------------------------------- */
+async function openOverlay(predictionId, label) {
+  let url = null;
+  const close = () => { if (url) URL.revokeObjectURL(url); ov.remove(); };
+  const ov = h("div", { class: "overlay", onclick: (e) => { if (e.target === ov) close(); } });
+  const sheet = h("div", { class: "sheet", style: "max-width:680px" },
+    h("div", { style: "display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px" },
+      h("div", {}, h("div", { class: "label" }, "Annotated overlay"),
+        h("h2", { style: "font-size:1.4rem;letter-spacing:-.02em;margin-top:4px" }, "Prediction #" + predictionId,
+          h("span", { class: "muted", style: "font-weight:400;font-size:1rem" }, label ? "  ·  " + label : ""))),
+      h("button", { class: "btn btn--ghost btn--sm", onclick: close }, "Close")),
+    h("div", { class: "sk", style: "width:100%;height:340px;border-radius:6px" }));
+  ov.append(sheet); document.body.append(ov);
+  try {
+    const blob = await apiBlob(`/predictions/${predictionId}/overlay`);
+    url = URL.createObjectURL(blob);
+    sheet.lastChild.replaceWith(h("img", {
+      src: url, alt: `Annotated overlay for prediction ${predictionId}${label ? " (" + label + ")" : ""}`,
+      style: "display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:6px",
+    }));
+  } catch (e) {
+    sheet.lastChild.replaceWith(errorNote(
+      e.status === 404 ? "This overlay is not in storage yet. It is written when the inference worker finishes the batch."
+      : e.status === 403 ? "You do not have permission to view overlays."
+      : e.message));
+  }
+}
+
+function PredictionsView() {
+  const isReviewer = store.me?.role === "reviewer";
+  const root = h("section", { class: "rise" });
+  const panel = h("div", { class: "panel" });
+  const reload = h("button", { class: "btn btn--ghost btn--sm", onclick: load }, iconRefresh(), "Refresh");
+  root.append(
+    h("div", { class: "head" },
+      h("div", {}, h("h2", {}, "Recent predictions"),
+        h("p", {}, isReviewer ? "Rows under 70% confidence can be relabeled." : "Model output, newest first.")),
+      reload),
+    isReviewer ? null : h("div", { class: "note note--info", style: "margin-bottom:18px" },
+      "Relabeling is restricted to the reviewer role. You are signed in as " + (store.me?.role || "—") + "."),
+    panel);
+
+  function row(p, i) {
+    const canRelabel = isReviewer && p.confidence < 0.7;
+    const labelCell = h("td", {}, h("span", { style: "font-weight:600" }, p.label));
+    const actionCell = h("td", { style: "text-align:right" });
+
+    if (canRelabel) {
+      const sel = h("select", {}, ...LABELS.map(l => h("option", { value: l, ...(l === p.label ? { selected: "" } : {}) }, l)));
+      const save = h("button", { class: "btn btn--sm btn--accent" }, "Save");
+      const msg = h("span", { class: "label", style: "margin-right:10px" });
+      save.addEventListener("click", async () => {
+        if (sel.value === p.label) { msg.textContent = "no change"; return; }
+        save.disabled = true; sel.disabled = true; msg.textContent = "saving…";
+        try {
+          const updated = await api(`/predictions/${p.id}/label`, { method: "PATCH", body: { label: sel.value } });
+          labelCell.innerHTML = ""; labelCell.append(h("span", { style: "font-weight:600" }, updated.label),
+            h("span", { class: "badge badge--complete", style: "margin-left:8px" }, "relabeled"));
+          actionCell.innerHTML = ""; actionCell.append(h("span", { class: "muted", style: "font-size:.85rem" }, "Updated"));
+        } catch (e) {
+          msg.textContent = ""; save.disabled = false; sel.disabled = false;
+          actionCell.append(h("div", { class: "note note--err", style: "margin-top:8px;text-align:left" }, e.message));
+        }
+      });
+      actionCell.append(h("div", { style: "display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap" },
+        msg, h("div", { class: "field", style: "margin:0" }, sel), save));
+    } else {
+      actionCell.append(h("span", { class: "label" }, isReviewer ? "Confident" : "—"));
+    }
+
+    return h("tr", { style: `--i:${i}` },
+      h("td", {}, h("span", { class: "num" }, "#" + p.id)),
+      labelCell,
+      h("td", {}, confidenceCell(p.confidence)),
+      h("td", {}, h("span", { class: "num" }, "#" + p.batch_id)),
+      h("td", {}, h("button", {
+        class: "btn btn--ghost btn--sm", title: p.overlay_path || "",
+        onclick: () => openOverlay(p.id, p.label),
+      }, iconImage(), "View")),
+      h("td", { class: "muted" }, fmtTime(p.created_at)),
+      actionCell);
+  }
+
+  async function load() {
+    panel.innerHTML = ""; reload.disabled = true;
+    const sk = h("table", {}, h("thead", {}, h("tr", {}, ["ID","Label","Confidence","Batch","Overlay","Created",""].map(x => h("th", {}, x)))));
+    sk.append(skeletonTable(7)); panel.append(sk);
+    try {
+      const rows = await api("/predictions/recent");
+      panel.innerHTML = "";
+      if (!rows.length) { panel.append(emptyState("No predictions yet", "Predictions appear once the inference worker finishes classifying an ingested batch.")); return; }
+      const t = h("table", {}, h("thead", {}, h("tr", {},
+        h("th", {}, "ID"), h("th", {}, "Label"), h("th", {}, "Confidence"),
+        h("th", {}, "Batch"), h("th", {}, "Overlay"), h("th", {}, "Created"), h("th", { style: "text-align:right" }, isReviewer ? "Relabel" : ""))));
+      const tb = h("tbody", { class: "stagger" });
+      rows.forEach((p, i) => tb.append(row(p, i)));
+      t.append(tb); panel.append(t);
+    } catch (e) {
+      panel.innerHTML = ""; panel.append(h("div", { style: "padding:24px" }, errorNote(e.message)));
+    } finally { reload.disabled = false; }
+  }
+
+  load();
+  return root;
+}
+
+/* ---- audit log ---------------------------------------------------------- */
+function AuditView() {
+  const root = h("section", { class: "rise" });
+  const actorIn = h("input", { type: "number", min: "1", placeholder: "any actor id" });
+  const actionSel = h("select", {}, h("option", { value: "" }, "any action"), ...AUDIT_ACTIONS.map(a => h("option", { value: a }, a)));
+  const panel = h("div", { class: "panel" });
+
+  root.append(
+    h("div", { class: "head" }, h("div", {}, h("h2", {}, "Audit log"),
+      h("p", {}, "Every role change, relabel, and batch transition — who, what, before, after."))),
+    h("div", { class: "filters" },
+      h("div", { class: "field" }, h("label", { class: "label" }, "Actor id"), actorIn),
+      h("div", { class: "field" }, h("label", { class: "label" }, "Action"), actionSel),
+      h("button", { class: "btn btn--sm", onclick: load }, "Apply"),
+      h("button", { class: "btn btn--ghost btn--sm", onclick: () => { actorIn.value = ""; actionSel.value = ""; load(); } }, "Clear")),
+    panel);
+
+  function valCell(v) {
+    if (v == null) return h("span", { class: "muted" }, "—");
+    return h("code", { class: "mono", style: "font-size:.82rem" }, JSON.stringify(v));
+  }
+
+  async function load() {
+    panel.innerHTML = "";
+    const sk = h("table", {}, h("thead", {}, h("tr", {}, ["ID","Actor","Action","Target","Before","After","When"].map(x => h("th", {}, x)))));
+    sk.append(skeletonTable(6)); panel.append(sk);
+    const qs = new URLSearchParams();
+    if (actorIn.value) qs.set("actor", actorIn.value);
+    if (actionSel.value) qs.set("action", actionSel.value);
+    try {
+      const rows = await api("/audit-log" + (qs.toString() ? "?" + qs : ""));
+      panel.innerHTML = "";
+      if (!rows.length) { panel.append(emptyState("No matching entries", "Nothing in the audit log for this filter yet.")); return; }
+      const t = h("table", {}, h("thead", {}, h("tr", {},
+        ["ID","Actor","Action","Target","Before","After","When"].map(x => h("th", {}, x)))));
+      const tb = h("tbody", { class: "stagger" });
+      rows.forEach((a, i) => tb.append(h("tr", { style: `--i:${i}` },
+        h("td", {}, h("span", { class: "num" }, "#" + a.id)),
+        h("td", {}, h("span", { class: "num" }, "#" + a.actor_id)),
+        h("td", {}, h("span", { class: "badge badge--role" }, a.action)),
+        h("td", { class: "muted mono" }, `${a.target_type}#${a.target_id}`),
+        h("td", {}, valCell(a.old_value)),
+        h("td", {}, valCell(a.new_value)),
+        h("td", { class: "muted" }, fmtTime(a.timestamp)))));
+      t.append(tb); panel.append(t);
+    } catch (e) {
+      panel.innerHTML = "";
+      panel.append(h("div", { style: "padding:24px" }, errorNote(
+        e.status === 403 ? "The audit log is visible to admin and auditor roles only." : e.message)));
+    }
+  }
+
+  load();
+  return root;
+}
+
+/* ---- admin: change a user's role --------------------------------------- */
+function AdminView() {
+  const root = h("section", { class: "rise" });
+  const uid = h("input", { type: "number", min: "1", placeholder: "user id, e.g. 4" });
+  const roleSel = h("select", {}, ...ROLES.map(r => h("option", { value: r }, r)));
+  const out = h("div", {});
+  const submit = h("button", { class: "btn btn--accent", style: "width:100%;justify-content:center" }, "Update role");
+
+  submit.addEventListener("click", async () => {
+    out.innerHTML = "";
+    if (!uid.value) { out.append(h("div", { class: "note note--err" }, "Enter a user id.")); return; }
+    submit.disabled = true; submit.textContent = "Updating…";
+    try {
+      const u = await api(`/users/${uid.value}/role`, { method: "PATCH", body: { role: roleSel.value } });
+      out.append(h("div", { class: "note note--ok" }, `User #${u.id} (${u.email}) is now ${u.role}.`));
+      if (store.me && u.id === store.me.id) { store.me = u; render(); }
+    } catch (e) {
+      out.append(h("div", { class: "note note--err" },
+        e.status === 403 ? "Only an admin can change roles." :
+        e.status === 400 ? "Refused — the system blocks the sole admin from self-demoting." : e.message));
+    } finally { submit.disabled = false; submit.textContent = "Update role"; }
+  });
+
+  root.append(
+    h("div", { class: "head" }, h("div", {}, h("h2", {}, "Administration"),
+      h("p", {}, "Assign roles. Changes take effect on the target user's next request."))),
+    h("div", { class: "grid-2" },
+      h("div", { class: "card" },
+        h("div", { class: "label", style: "margin-bottom:16px" }, "Change user role"),
+        h("div", { class: "field" }, h("label", { class: "label" }, "User id"), uid),
+        h("div", { class: "field" }, h("label", { class: "label" }, "New role"), roleSel),
+        submit,
+        h("div", { style: "margin-top:16px" }, out)),
+      h("div", { class: "card" },
+        h("div", { class: "label", style: "margin-bottom:16px" }, "Signed in as"),
+        h("dl", { class: "kv" },
+          h("dt", {}, "User id"), h("dd", {}, "#" + (store.me?.id ?? "—")),
+          h("dt", {}, "Email"), h("dd", {}, store.me?.email ?? "—"),
+          h("dt", {}, "Role"), h("dd", {}, store.me?.role ?? "—"),
+          h("dt", {}, "Since"), h("dd", {}, store.me?.created_at ? fmtTime(store.me.created_at) : "—")))));
+  return root;
+}
+
+/* ---- app shell ---------------------------------------------------------- */
+function AppShell() {
+  const role = store.me?.role;
+  const tabs = [
+    { id: "batches", label: "Batches", view: BatchesView },
+    { id: "predictions", label: "Predictions", view: PredictionsView },
+  ];
+  if (role === "admin" || role === "auditor") tabs.push({ id: "audit", label: "Audit log", view: AuditView });
+  if (role === "admin") tabs.push({ id: "admin", label: "Administration", view: AdminView });
+
+  let active = tabs[0].id;
+  const body = h("div", {});
+  const nav = h("nav", { class: "nav" });
+
+  function paintNav() {
+    nav.innerHTML = "";
+    tabs.forEach(t => nav.append(h("button", {
+      class: "tab", "aria-selected": String(t.id === active),
+      onclick: () => { active = t.id; paintNav(); body.innerHTML = ""; body.append(tabs.find(x => x.id === active).view()); }
+    }, t.label)));
+  }
+  paintNav();
+  body.append(tabs[0].view());
+
+  return h("div", {},
+    h("header", { class: "topbar" },
+      h("div", { class: "topbar__brand" }, h("div", { class: "mark" }, h("span")), "Document Classifier"),
+      h("div", { class: "topbar__right" },
+        h("div", { class: "userchip" },
+          h("span", { class: "who" }, store.me?.email || ""),
+          h("span", { class: "badge badge--role" }, role || "—")),
+        h("button", { class: "btn btn--ghost btn--sm", onclick: () => { store.token = null; store.me = null; render(); } },
+          iconLogout(), "Sign out"))),
+    h("main", { class: "wrap" }, nav, body));
+}
+
+/* ---- icons (no emoji; clean SVG primitives) ----------------------------- */
+function svg(d, extra = "") {
+  const s = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const w = document.createElement("span"); w.style.display = "inline-flex"; w.innerHTML = s; return w;
+}
+const iconRefresh = () => svg('<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>');
+const iconLogout = () => svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>');
+const iconImage = () => svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>');
+const iconUpload = () => svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/>');
+
+/* ---- root render -------------------------------------------------------- */
+function render() {
+  const root = $("#root");
+  root.innerHTML = "";
+  root.append(store.token && store.me ? AppShell() : AuthView());
+}
+
+async function boot() {
+  if (store.token) {
+    try { store.me = await api("/users/me"); }
+    catch { store.token = null; store.me = null; }
+  }
+  render();
+}
+boot();
+</script>
+</body>
+</html>

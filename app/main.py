@@ -9,8 +9,11 @@ FastAPI app entry point.
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.api.middleware.request_id import add_request_id_middleware
 from app.api.routers.audit import router as audit_router
@@ -58,6 +61,18 @@ app = FastAPI(
 
 add_request_id_middleware(app)
 
+# CORS for the bundled web client. Auth is Bearer-token based (no
+# cookies), so a wildcard origin with credentials disabled is safe
+# and keeps local testing friction-free (Swagger, file://, a
+# separate static host all work).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Mount all routers. URL prefixes live here, not in the router
 # files, so the entire URL surface is visible in one place. Tags
 # group endpoints in the auto-generated /docs page.
@@ -66,3 +81,15 @@ app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(batches_router, prefix="/batches", tags=["batches"])
 app.include_router(predictions_router, prefix="/predictions", tags=["predictions"])
 app.include_router(audit_router, prefix="/audit-log", tags=["audit"])
+
+# Bundled single-file web client. Served same-origin so the client
+# calls the API with no CORS hop. Resolved relative to this file so
+# it works regardless of the process working directory (Docker
+# WORKDIR=/app vs. running from the repo root).
+_WEB_INDEX = Path(__file__).parent / "web" / "index.html"
+
+
+@app.get("/", include_in_schema=False)
+async def web_client() -> FileResponse:
+    """Serve the Document Classifier web client."""
+    return FileResponse(_WEB_INDEX)

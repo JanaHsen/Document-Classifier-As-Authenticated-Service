@@ -23,7 +23,7 @@ service needs it to record the actor in the audit log.
 """
 
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from app.api.deps.permissions import require_permission
 from app.api.schemas.prediction import PredictionRead, RelabelRequest
@@ -62,6 +62,43 @@ async def get_recent_predictions(
     configure it (cache control is the service layer's job).
     """
     return await prediction_service.get_recent()
+
+
+@router.get(
+    "/{pid}/overlay",
+    response_class=Response,
+    responses={
+        200: {"content": {"image/png": {}}, "description": "The overlay PNG."},
+        404: {"description": "Prediction or its overlay object not found."},
+    },
+    summary="Get the annotated overlay PNG (all three roles)",
+    dependencies=[Depends(require_permission("predictions", "read"))],
+)
+async def get_prediction_overlay(
+    pid: int,
+    prediction_service: PredictionService = Depends(get_prediction_service),
+) -> Response:
+    """
+    GET /predictions/{pid}/overlay — stream the annotated PNG.
+
+    Auth chain (resolved before this body runs):
+      1. current_active_user — 401 if no/invalid JWT.
+      2. require_permission("predictions", "read") — 403 if the
+         caller's role lacks the policy. Same gate as
+         /predictions/recent, so all three roles may view overlays.
+
+    Not run through fastapi-cache2 (it serializes JSON, not binary).
+    The overlay object is immutable once written by the inference
+    worker, so a private browser cache is safe and keeps repeat
+    views off MinIO. The service raises 404 if the prediction or
+    the stored object is missing.
+    """
+    image_bytes = await prediction_service.get_overlay(pid)
+    return Response(
+        content=image_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.patch(

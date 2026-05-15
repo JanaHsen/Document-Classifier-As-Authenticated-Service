@@ -86,6 +86,22 @@ Schema:
 
 # API Contracts
 
+## POST /batches/upload
+
+Admin only (`batches:create`). `multipart/form-data` with one or
+more `files` parts (TIFF, ≤ 25 MB each). One batch is created per
+file and queued for inference — the same pipeline as SFTP ingest.
+
+Response: `202 Accepted`
+
+```json
+[
+  { "id": 12, "status": "pending", "created_at": "2026-05-15T10:00:00Z", "file_count": 1 }
+]
+```
+
+---
+
 ## GET /batches/{id}
 
 Response:
@@ -249,6 +265,11 @@ Example Path:
 ```text
 overlays/invoice1.png
 ```
+
+Stored in the `overlays` MinIO bucket. Exposed read-only via
+`GET /predictions/{pid}/overlay` (all roles, `predictions:read`),
+which streams the PNG with `Content-Type: image/png`. 404 if the
+prediction or its stored object is missing.
 
 ---
 

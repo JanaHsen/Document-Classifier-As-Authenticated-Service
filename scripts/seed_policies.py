@@ -17,6 +17,7 @@ Permission matrix (derived from Trello cards 3, 4, 5, 6, 7):
 | resource    | action  | admin | reviewer | auditor |
 | ----------- | ------- | ----- | -------- | ------- |
 | batches     | read    |   x   |    x     |    x    |
+| batches     | create  |   x   |          |         |
 | predictions | read    |   x   |    x     |    x    |
 | predictions | relabel |       |    x     |         |
 | audit_log   | read    |   x   |          |    x    |
@@ -53,6 +54,12 @@ POLICIES = [
     ("admin", "batches", "read"),
     ("reviewer", "batches", "read"),
     ("auditor", "batches", "read"),
+
+    # batches:create — admin only. HTTP document upload
+    # (POST /batches/upload) is an operational action; least
+    # privilege keeps reviewer/auditor read-only. SFTP ingest is
+    # unauthenticated machine-to-machine and bypasses Casbin.
+    ("admin", "batches", "create"),
 
     # predictions:read — everyone reads predictions
     ("admin", "predictions", "read"),

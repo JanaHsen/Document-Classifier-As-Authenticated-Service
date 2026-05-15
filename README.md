@@ -206,6 +206,7 @@ All endpoints (except `/auth/*`) require a `Bearer` JWT token in the `Authorizat
 ### Batches
 | Method | Path | Roles | Description |
 |---|---|---|---|
+| `POST` | `/batches/upload` | admin | Upload TIFF documents (one batch per file) into the inference pipeline |
 | `GET` | `/batches` | all | List all batches (cached 60s) |
 | `GET` | `/batches/{bid}` | all | Get batch detail (cached 60s) |
 
@@ -213,6 +214,7 @@ All endpoints (except `/auth/*`) require a `Bearer` JWT token in the `Authorizat
 | Method | Path | Roles | Description |
 |---|---|---|---|
 | `GET` | `/predictions/recent` | all | List recent predictions (cached 30s) |
+| `GET` | `/predictions/{pid}/overlay` | all | Stream the annotated overlay PNG from MinIO |
 | `PATCH` | `/predictions/{pid}/label` | reviewer | Correct label on low-confidence predictions (confidence < 0.7 only) |
 
 ### Audit
@@ -227,6 +229,7 @@ All endpoints (except `/auth/*`) require a `Bearer` JWT token in the `Authorizat
 | Action | admin | reviewer | auditor |
 |---|:---:|:---:|:---:|
 | View batches | ✓ | ✓ | ✓ |
+| Upload documents | ✓ | | |
 | View predictions | ✓ | ✓ | ✓ |
 | Relabel predictions (confidence < 0.7) | | ✓ | |
 | View audit log | ✓ | | ✓ |

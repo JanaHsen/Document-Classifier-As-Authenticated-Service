@@ -25,7 +25,9 @@ Why dependencies=[...] and not a User parameter:
 """
 
 
-from fastapi import APIRouter, Depends
+import uuid
+
+from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from app.api.deps.permissions import require_permission
 from app.api.schemas.batch import BatchRead
@@ -34,6 +36,46 @@ from fastapi_cache.decorator import cache
 
 
 router = APIRouter()
+
+
+@router.post(
+    "/upload",
+    response_model=list[BatchRead],
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Upload TIFF documents for classification (admin only)",
+    dependencies=[Depends(require_permission("batches", "create"))],
+)
+async def upload_documents(
+    files: list[UploadFile] = File(..., description="One or more TIFF files"),
+    batch_service: BatchService = Depends(get_batch_service),
+):
+    """
+    POST /batches/upload — HTTP entry point into the same pipeline
+    the SFTP ingest worker feeds. One batch is created per file.
+
+    Auth chain (resolved before this body runs):
+      1. current_active_user — 401 if JWT is missing/expired.
+      2. require_permission("batches", "create") — 403 unless the
+         caller is admin. This is a new policy in the seeded matrix;
+         run scripts/seed_policies.py once for existing deployments.
+
+    Thin router: it generates a tracing request_id per file and
+    delegates all validation, blob storage, batch creation, the
+    commit-before-enqueue ordering, and queueing to the service.
+    Returns 202 (accepted for async classification) with the list of
+    created batches, newest work last.
+    """
+    results: list[BatchRead] = []
+    for upload in files:
+        data = await upload.read()
+        results.append(
+            await batch_service.ingest_upload(
+                filename=upload.filename or "upload.tiff",
+                data=data,
+                request_id=str(uuid.uuid4()),
+            )
+        )
+    return results
 
 
 @router.get(
