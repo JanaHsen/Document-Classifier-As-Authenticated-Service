@@ -46,6 +46,55 @@ def _update_batch_state(batch_id: int, state: BatchStatus) -> None:
     engine.dispose()
 
 
+def _mark_batch_processing(batch_id: int) -> None:
+    """Move a batch pending -> processing. A batch can hold several
+    files (one job each); only the first job makes this transition,
+    and the WHERE clause means a job never downgrades a batch another
+    sibling already advanced or failed."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import NullPool
+    engine = create_engine(_pg2_url(), poolclass=NullPool)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE batches SET state = 'processing', updated_at = NOW()"
+                " WHERE id = :id AND state = 'pending'"
+            ),
+            {"id": batch_id},
+        )
+    engine.dispose()
+
+
+def _finalize_batch_if_done(batch_id: int) -> bool:
+    """Flip the batch to COMPLETE only once every file in it has a
+    prediction (predictions count >= batches.file_count) AND no
+    sibling job has already failed the batch. Returns True if this
+    call was the one that completed the batch.
+
+    The whole decision is one atomic UPDATE so that with multiple
+    worker replicas exactly the last finishing job completes the
+    batch; earlier jobs see count < file_count and no-op."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import NullPool
+    engine = create_engine(_pg2_url(), poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    "UPDATE batches SET state = 'complete', updated_at = NOW()"
+                    " WHERE id = :id"
+                    "   AND state <> 'failed'"
+                    "   AND state <> 'complete'"
+                    "   AND (SELECT count(*) FROM predictions"
+                    "        WHERE batch_id = :id) >= file_count"
+                ),
+                {"id": batch_id},
+            )
+            return result.rowcount > 0
+    finally:
+        engine.dispose()
+
+
 def _save_prediction(batch_id: int, label: str, confidence: float, overlay_path: str) -> None:
     from sqlalchemy import create_engine, text
     from sqlalchemy.pool import NullPool
@@ -85,7 +134,7 @@ def process_job(job: dict) -> None:
 
     try:
         t0 = time.time()
-        _update_batch_state(batch_id, BatchStatus.PROCESSING)
+        _mark_batch_processing(batch_id)
         _log("INFO", "step: state=PROCESSING", request_id=request_id, elapsed=round(time.time() - t0, 2))
 
         t0 = time.time()
@@ -117,8 +166,14 @@ def process_job(job: dict) -> None:
         _save_prediction(batch_id, result.label, result.confidence, overlay_path)
         _log("INFO", "step: prediction saved", request_id=request_id, elapsed=round(time.time() - t0, 2))
 
-        _update_batch_state(batch_id, BatchStatus.COMPLETE)
-        _log("INFO", "job complete", request_id=request_id, batch_id=batch_id)
+        batch_done = _finalize_batch_if_done(batch_id)
+        _log(
+            "INFO",
+            "job complete" + (", batch COMPLETE" if batch_done else ", batch still in progress"),
+            request_id=request_id,
+            batch_id=batch_id,
+            batch_complete=batch_done,
+        )
 
     except Exception as e:
         _update_batch_state(batch_id, BatchStatus.FAILED)

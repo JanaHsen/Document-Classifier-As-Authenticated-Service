@@ -32,5 +32,9 @@ class Settings(BaseSettings):
     VAULT_ADDR: str = "http://localhost:8200"
     VAULT_TOKEN: str = ""
 
+    # Uploads — per-file size cap enforced by the batch service on
+    # POST /batches/upload. Ops policy, tunable without a code change.
+    MAX_UPLOAD_MB: int = 25
+
 
 settings = Settings()

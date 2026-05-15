@@ -38,6 +38,11 @@ class Batch(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     state: Mapped[BatchStatus] = mapped_column(SQLEnum(BatchStatus, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    # Number of documents this batch is expected to contain. An upload
+    # of N files creates one batch with file_count=N; the inference
+    # worker compares it against the prediction count to decide when
+    # the whole batch is COMPLETE.
+    file_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
     )

@@ -467,9 +467,9 @@ function openUpload(onDone) {
     const fd = new FormData();
     Array.from(input.files).forEach(f => fd.append("files", f, f.name));
     try {
-      const batches = await apiUpload("/batches/upload", fd);
+      const batch = await apiUpload("/batches/upload", fd);
       result.append(h("div", { class: "note note--ok", style: "margin-top:14px" },
-        `${batches.length} batch${batches.length === 1 ? "" : "es"} queued (#${batches.map(b => b.id).join(", #")}). Classification runs in the background — refresh in a few seconds.`));
+        `Batch #${batch.id} queued with ${batch.file_count} file${batch.file_count === 1 ? "" : "s"}. Classification runs in the background — refresh in a few seconds.`));
       submit.textContent = "Done";
       if (typeof onDone === "function") onDone();
       setTimeout(close, 1800);

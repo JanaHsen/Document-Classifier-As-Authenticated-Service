@@ -40,7 +40,7 @@ router = APIRouter()
 
 @router.post(
     "/upload",
-    response_model=list[BatchRead],
+    response_model=BatchRead,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Upload TIFF documents for classification (admin only)",
     dependencies=[Depends(require_permission("batches", "create"))],
@@ -51,7 +51,10 @@ async def upload_documents(
 ):
     """
     POST /batches/upload — HTTP entry point into the same pipeline
-    the SFTP ingest worker feeds. One batch is created per file.
+    the SFTP ingest worker feeds. All files in one request become a
+    SINGLE batch (file_count = number of files); the inference worker
+    classifies each file and only marks the batch COMPLETE once every
+    file in it has a prediction.
 
     Auth chain (resolved before this body runs):
       1. current_active_user — 401 if JWT is missing/expired.
@@ -59,23 +62,20 @@ async def upload_documents(
          caller is admin. This is a new policy in the seeded matrix;
          run scripts/seed_policies.py once for existing deployments.
 
-    Thin router: it generates a tracing request_id per file and
-    delegates all validation, blob storage, batch creation, the
-    commit-before-enqueue ordering, and queueing to the service.
-    Returns 202 (accepted for async classification) with the list of
-    created batches, newest work last.
+    Thin router: it reads every uploaded file, generates one tracing
+    request_id for the batch, and delegates all validation, blob
+    storage, batch creation, the commit-before-enqueue ordering, and
+    queueing to the service. Returns 202 (accepted for async
+    classification) with the single created batch.
     """
-    results: list[BatchRead] = []
-    for upload in files:
-        data = await upload.read()
-        results.append(
-            await batch_service.ingest_upload(
-                filename=upload.filename or "upload.tiff",
-                data=data,
-                request_id=str(uuid.uuid4()),
-            )
-        )
-    return results
+    payloads = [
+        ((upload.filename or "upload.tiff"), await upload.read())
+        for upload in files
+    ]
+    return await batch_service.ingest_uploads(
+        files=payloads,
+        request_id=str(uuid.uuid4()),
+    )
 
 
 @router.get(
