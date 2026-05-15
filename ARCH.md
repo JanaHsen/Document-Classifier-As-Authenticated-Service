@@ -64,8 +64,6 @@ Responsibilities:
 - quarantine invalid uploads
 - create batch records
 
-Owner:
-- Hadi
 
 ---
 
@@ -79,8 +77,6 @@ Purpose:
 Behavior:
 - acts as S3-compatible blob storage
 
-Owner:
-- Hadi
 
 ---
 
@@ -102,9 +98,6 @@ Example Job Payload:
 }
 ```
 
-Owner:
-- Hadi
-
 ---
 
 ## 5. Inference Worker
@@ -120,9 +113,6 @@ Responsibilities:
 - validate model SHA256
 - refuse startup if model invalid
 - generate overlay PNGs
-
-Owner:
-- Hawraa
 
 ---
 
@@ -143,9 +133,6 @@ Artifacts:
 - model_card.json
 - golden set
 
-Owner:
-- Hawraa
-
 ---
 
 ## 7. PostgreSQL Database
@@ -160,9 +147,6 @@ Stores:
 - audit logs
 - relabel actions
 
-Owner:
-- Tarek
-
 ---
 
 ## 8. Repository Layer
@@ -174,9 +158,6 @@ Rules:
 - no business logic
 - no cache invalidation
 - no HTTP exceptions
-
-Owner:
-- Tarek
 
 ---
 
@@ -192,9 +173,6 @@ Purpose:
 Rules:
 - routers never touch repositories directly
 
-Owner:
-- Tarek
-
 ---
 
 ## 10. Authentication System
@@ -207,9 +185,6 @@ Purpose:
 - registration
 - login
 - identity validation
-
-Owner:
-- Jana
 
 ---
 
@@ -230,9 +205,6 @@ Behavior:
 - permissions update dynamically
 - role changes apply immediately
 
-Owner:
-- Jana
-
 ---
 
 ## 12. API Layer
@@ -246,9 +218,6 @@ Purpose:
 Rules:
 - API never runs inference
 - routers only call services
-
-Owner:
-- Jana
 
 ---
 
@@ -266,9 +235,6 @@ Cached Endpoints:
 
 Rules:
 - invalidation occurs only in service layer
-
-Owner:
-- Tarek
 
 ---
 
@@ -288,9 +254,6 @@ Stores:
 Behavior:
 - API and workers refuse startup if Vault unavailable
 
-Owner:
-- Hadi
-
 ---
 
 ## 15. CI/CD
@@ -304,9 +267,6 @@ Checks:
 - Docker build
 - golden-set replay
 - compose smoke test
-
-Owner:
-- Hadi
 
 ---
 
