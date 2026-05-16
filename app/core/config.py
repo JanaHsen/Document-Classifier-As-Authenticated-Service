@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     )
 
     # App
+    # Toggles SQLAlchemy SQL echo (every query printed to stdout). Off in prod, on for local debugging.
     DEBUG: bool = False
 
     # Database — Tarek's session.py reads these exact field names

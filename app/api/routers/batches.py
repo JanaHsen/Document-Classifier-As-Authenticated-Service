@@ -30,7 +30,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from app.api.deps.permissions import require_permission
-from app.api.schemas.batch import BatchRead
+from app.api.schemas.batch import BatchRead, IngestQueued
 from app.services.batch_service import BatchService, get_batch_service
 from fastapi_cache.decorator import cache
 
@@ -40,7 +40,7 @@ router = APIRouter()
 
 @router.post(
     "/upload",
-    response_model=list[BatchRead],
+    response_model=list[IngestQueued],
     status_code=status.HTTP_202_ACCEPTED,
     summary="Upload TIFF documents for classification (admin only)",
     dependencies=[Depends(require_permission("batches", "create"))],
@@ -50,22 +50,15 @@ async def upload_documents(
     batch_service: BatchService = Depends(get_batch_service),
 ):
     """
-    POST /batches/upload — HTTP entry point into the same pipeline
-    the SFTP ingest worker feeds. One batch is created per file.
+    POST /batches/upload — validates each TIFF and drops it onto the
+    SFTP /uploads directory. The sftp_ingest_worker picks it up within
+    its poll interval (5 s), creates a batch, stores the blob in MinIO,
+    and enqueues inference — the same path as a direct SFTP drop.
 
-    Auth chain (resolved before this body runs):
-      1. current_active_user — 401 if JWT is missing/expired.
-      2. require_permission("batches", "create") — 403 unless the
-         caller is admin. This is a new policy in the seeded matrix;
-         run scripts/seed_policies.py once for existing deployments.
-
-    Thin router: it generates a tracing request_id per file and
-    delegates all validation, blob storage, batch creation, the
-    commit-before-enqueue ordering, and queueing to the service.
-    Returns 202 (accepted for async classification) with the list of
-    created batches, newest work last.
+    Returns 202 with the remote SFTP path for each file. Batches appear
+    in GET /batches within a few seconds once the worker processes them.
     """
-    results: list[BatchRead] = []
+    results: list[IngestQueued] = []
     for upload in files:
         data = await upload.read()
         results.append(

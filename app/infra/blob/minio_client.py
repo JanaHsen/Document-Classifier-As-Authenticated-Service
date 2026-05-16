@@ -13,6 +13,7 @@ from app.exceptions import NotFoundError
 OVERLAY_BUCKET = "overlays"
 
 
+# Opens a connection to MinIO once and reuses it every time.
 @lru_cache(maxsize=1)
 def _get_client() -> Minio:
     return Minio(
@@ -23,6 +24,7 @@ def _get_client() -> Minio:
     )
 
 
+# Downloads a TIFF from MinIO to a temporary file on disk and returns the path to it.
 def download_tiff(blob_path: str) -> str:
     """Download a TIFF from MinIO and return the local temp file path."""
     client = _get_client()
@@ -31,6 +33,7 @@ def download_tiff(blob_path: str) -> str:
     return tmp.name
 
 
+# Takes a PNG file on disk and pushes it up to the overlays bucket.
 def upload_overlay(local_path: str, overlay_path: str) -> None:
     """Upload a local overlay PNG to the overlays bucket in MinIO."""
     client = _get_client()
@@ -39,6 +42,7 @@ def upload_overlay(local_path: str, overlay_path: str) -> None:
     )
 
 
+# Fetches an overlay PNG from MinIO and returns its bytes, or raises NotFoundError if it doesn't exist.
 def download_overlay(overlay_path: str) -> bytes:
     """
     Fetch an overlay PNG from the overlays bucket and return its bytes.
@@ -62,6 +66,7 @@ def download_overlay(overlay_path: str) -> bytes:
         response.release_conn()
 
 
+# Takes a TIFF as raw bytes and uploads it to the documents bucket under the incoming/ folder.
 def upload_document(data: bytes, object_name: str) -> str:
     """
     Upload a raw document into the documents bucket under the same

@@ -5,7 +5,6 @@ Handles business logic for batch operations.
 
 import os
 import uuid
-from typing import List
 
 from fastapi import HTTPException, status
 from fastapi.concurrency import run_in_threadpool
@@ -13,13 +12,12 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.constants import BatchStatus
 from app.domain.batch import BatchCreate, BatchOut, BatchUpdate
 from app.exceptions import NotFoundError
-from app.infra.blob.minio_client import upload_document
 from app.infra.logging.logger import get_logger
-from app.infra.queue.rq_queue import enqueue_inference_job
+from app.infra.sftp.uploader import upload_to_sftp
 from app.repositories.batch_repository import BatchRepository
 from app.services.audit_service import AuditService
 from app.services.cache_service import CacheService
-from app.api.schemas.batch import BatchRead
+from app.api.schemas.batch import BatchRead, IngestQueued
 
 logger = get_logger("batch_ingest")
 
@@ -83,22 +81,13 @@ class BatchService:
 
     async def ingest_upload(
         self, filename: str, data: bytes, request_id: str
-    ) -> BatchRead:
+    ) -> IngestQueued:
         """
-        Ingest a single uploaded document, mirroring the SFTP path:
-        validate -> create batch -> store blob -> enqueue inference.
+        Validate a TIFF upload and drop it onto the SFTP /uploads directory.
 
-        Each upload becomes its own one-file batch. That sidesteps
-        the multi-file-per-batch state race the SFTP grouping has
-        (the worker flips a shared batch to COMPLETE per job) and
-        makes the UI feedback per file unambiguous.
-
-        Transaction boundary note: get_async_session commits only
-        after the request returns, but the inference worker is a
-        separate process that must see the batch row the instant it
-        dequeues the job. So we commit the batch here, explicitly,
-        before enqueueing — the service owns the transaction
-        boundary, exactly as the SFTP ingest worker does.
+        The sftp_ingest_worker picks it up within its poll interval (5 s),
+        creates the batch, stores the blob in MinIO, and enqueues inference.
+        This makes HTTP upload and SFTP drop use the exact same pipeline.
         """
         name = (filename or "").lower()
         if not (name.endswith(".tif") or name.endswith(".tiff")):
@@ -122,57 +111,24 @@ class BatchService:
                 detail="File is not a valid TIFF (bad signature).",
             )
 
-        batch = await self.batch_repo.create(BatchCreate())
-        await self.batch_repo.session.commit()
-        batch_id = batch.id
-
-        object_name = _safe_object_name(filename)
+        safe_name = _safe_object_name(filename)
         try:
-            blob_path = await run_in_threadpool(
-                upload_document, data, object_name
-            )
-            await run_in_threadpool(
-                enqueue_inference_job, batch_id, blob_path, request_id
-            )
+            remote_path = await run_in_threadpool(upload_to_sftp, data, safe_name)
         except Exception as exc:
-            # Surface the batch as FAILED rather than leaving a
-            # silently-stuck PENDING row the worker will never see.
-            try:
-                await self.batch_repo.update_state(
-                    batch_id, BatchUpdate(state=BatchStatus.FAILED)
-                )
-                await self.batch_repo.session.commit()
-            except Exception:
-                pass
-            await self.cache_service.invalidate_batches_list()
             logger.error(
-                "upload ingest failed",
-                extra={
-                    "request_id": request_id,
-                    "batch_id": batch_id,
-                    "error": str(exc),
-                },
+                "sftp upload failed",
+                extra={"request_id": request_id, "filename": filename, "error": str(exc)},
             )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Upload stored but could not be queued for inference.",
+                detail="Could not deliver file to SFTP ingest queue.",
             )
 
-        await self.cache_service.invalidate_batches_list()
         logger.info(
-            "upload ingested",
-            extra={
-                "request_id": request_id,
-                "batch_id": batch_id,
-                "blob_path": blob_path,
-            },
+            "file dropped on sftp",
+            extra={"request_id": request_id, "remote_path": remote_path},
         )
-        return BatchRead(
-            id=batch.id,
-            created_at=batch.created_at,
-            status=batch.state,
-            file_count=1,
-        )
+        return IngestQueued(filename=safe_name, remote_path=remote_path)
 
     async def update_batch_state(
         self, batch_id: int, new_state: BatchStatus, actor_id: int

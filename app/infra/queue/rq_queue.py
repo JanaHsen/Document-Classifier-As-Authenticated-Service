@@ -17,12 +17,13 @@ def get_inference_queue() -> Queue:
 
 def enqueue_inference_job(batch_id: int, blob_path: str, request_id: str) -> None:
     queue = get_inference_queue()
+    # Drop a job into Redis. The worker will pick it up and call process_job() with this data.
     queue.enqueue(
-        "app.workers.inference_worker.process_job",
+        "app.workers.inference_worker.process_job",  # function the worker will call
         {
-            "batch_id": batch_id,
-            "blob_path": blob_path,
-            "request_id": request_id,
+            "batch_id": batch_id,    # which batch this document belongs to
+            "blob_path": blob_path,  # where the TIFF lives in MinIO
+            "request_id": request_id,  # unique ID for tracing in logs
         },
         job_timeout=600,
     )

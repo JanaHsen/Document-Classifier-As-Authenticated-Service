@@ -47,6 +47,14 @@ class BatchStatus(str, Enum):
     FAILED = "failed"          # worker hit an error; see audit log and worker logs
 
 
+class IngestQueued(BaseModel):
+    """Response for POST /batches/upload — file accepted and placed on SFTP."""
+
+    filename: str
+    remote_path: str
+    message: str = "Queued for SFTP ingest. A batch will appear within a few seconds."
+
+
 class BatchRead(BaseModel):
     """
     Response shape for GET /batches and GET /batches/{bid}.

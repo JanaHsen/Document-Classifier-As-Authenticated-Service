@@ -145,6 +145,8 @@ services:
         condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
+      sftp:
+        condition: service_started
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN:-root}
@@ -153,6 +155,11 @@ services:
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
       MINIO_BUCKET: documents
+      SFTP_HOST: sftp
+      SFTP_PORT: "22"
+      SFTP_USER: docuser
+      SFTP_PASS: docpass
+      SFTP_PATH: /uploads
       DEBUG: "false"
     ports:
       - "${API_PORT:-8000}:8000"

@@ -89,6 +89,13 @@ app.include_router(audit_router, prefix="/audit-log", tags=["audit"])
 _WEB_INDEX = Path(__file__).parent / "web" / "index.html"
 
 
+# Serves the bundled web page at the root URL. Hidden from API docs since it is not an API endpoint.
+# Flow:
+# 1. User opens http://localhost:8000/ in their browser.
+# 2. Browser sends a GET / request.
+# 3. FastAPI calls web_client().
+# 4. Function sends back the contents of app/web/index.html.
+# 5. Browser renders the web page.
 @app.get("/", include_in_schema=False)
 async def web_client() -> FileResponse:
     """Serve the Document Classifier web client."""
