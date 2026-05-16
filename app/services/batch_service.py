@@ -1,4 +1,4 @@
-﻿"""Batch Service.
+"""Batch Service.
 
 Handles business logic for batch operations.
 """
@@ -9,6 +9,7 @@ import uuid
 from fastapi import HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 
+from app.core.config import settings
 from app.core.constants import BatchStatus
 from app.domain.batch import BatchCreate, BatchOut, BatchUpdate
 from app.exceptions import NotFoundError
@@ -25,7 +26,7 @@ logger = get_logger("batch_ingest")
 # inference worker's job; this cheap sniff just rejects obvious
 # non-TIFF uploads early with a clear message.
 _TIFF_MAGIC = (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")
-_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+_MAX_UPLOAD_BYTES = settings.MAX_UPLOAD_MB * 1024 * 1024
 
 
 def _safe_object_name(filename: str) -> str:
@@ -52,13 +53,12 @@ class BatchService:
         """List all batches, newest first."""
         batches = await self.batch_repo.list_all()
         # Convert domain BatchInDB to API BatchRead.
-        # file_count is set to 0 (computed separately if needed)
         return [
             BatchRead(
                 id=b.id,
                 created_at=b.created_at,
                 status=b.state,
-                file_count=0,
+                file_count=b.file_count,
             )
             for b in batches
         ]
@@ -76,7 +76,7 @@ class BatchService:
             id=b.id,
             created_at=b.created_at,
             status=b.state,
-            file_count=0,
+            file_count=b.file_count,
         )
 
     async def ingest_upload(
@@ -103,7 +103,7 @@ class BatchService:
         if len(data) > _MAX_UPLOAD_BYTES:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="File exceeds the 25 MB upload limit.",
+                detail=f"File exceeds the {settings.MAX_UPLOAD_MB} MB upload limit.",
             )
         if data[:4] not in _TIFF_MAGIC:
             raise HTTPException(

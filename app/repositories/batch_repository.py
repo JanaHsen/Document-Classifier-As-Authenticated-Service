@@ -24,7 +24,7 @@ class BatchRepository:
         """Create a new batch with default PENDING state."""
         from app.core.constants import BatchStatus
 
-        batch = Batch(state=BatchStatus.PENDING)
+        batch = Batch(state=BatchStatus.PENDING, file_count=data.file_count)
         self.session.add(batch)
         await self.session.flush()
         await self.session.refresh(batch)
