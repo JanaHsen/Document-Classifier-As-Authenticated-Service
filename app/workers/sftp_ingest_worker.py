@@ -8,7 +8,7 @@ import uuid
 import paramiko
 
 from app.core.config import settings
-from app.domain.batch import BatchUpdate
+
 from app.infra.blob.minio_client import _get_client as get_minio
 from app.infra.logging.logger import get_logger
 from app.infra.queue.rq_queue import enqueue_inference_job
@@ -113,7 +113,7 @@ def main() -> None:
             
             count += 1
             
-            update_file_count = asyncio.run(_update_batch_file_count(current_batch_id, count))
+            asyncio.run(_update_batch_file_count(current_batch_id, count))
             local_path = _download_from_sftp(remote_path)
             blob_path = _upload_to_minio(local_path, filename)
             enqueue_inference_job(
