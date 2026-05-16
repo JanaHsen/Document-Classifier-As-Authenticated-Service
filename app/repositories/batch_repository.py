@@ -61,4 +61,19 @@ class BatchRepository:
             raise NotFoundError(entity="Batch", identifier=str(batch_id))
         await self.session.flush()
         return await self.get_by_id(batch_id)
+    
+    
+    async def update_file_count(self, batch_id: int, data: BatchUpdate) -> BatchInDB:
+        """Update the file count of a batch."""
+        stmt = (
+            update(Batch)
+            .where(Batch.id == batch_id)
+            .values(file_count=data.file_count)
+            .execution_options(synchronize_session="fetch")
+        )
+        result = await self.session.execute(stmt)
+        if result.rowcount == 0:
+            raise NotFoundError(entity="Batch", identifier=str(batch_id))
+        await self.session.flush()
+        return await self.get_by_id(batch_id)
 

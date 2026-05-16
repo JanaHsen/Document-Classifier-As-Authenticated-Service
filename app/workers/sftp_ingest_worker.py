@@ -8,6 +8,7 @@ import uuid
 import paramiko
 
 from app.core.config import settings
+from app.domain.batch import BatchUpdate
 from app.infra.blob.minio_client import _get_client as get_minio
 from app.infra.logging.logger import get_logger
 from app.infra.queue.rq_queue import enqueue_inference_job
@@ -38,6 +39,24 @@ async def _create_batch() -> int:
     async with session_factory() as session:
         repo = BatchRepository(session)
         batch = await repo.create(BatchCreate())
+        await session.commit()
+        batch_id = batch.id
+    await engine.dispose()
+    return batch_id
+
+async def _update_batch_file_count(batch_id: int, file_count: int) -> None:
+    """Update the file count of an existing batch."""
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+    from app.domain.batch import BatchCreate
+    from app.repositories.batch_repository import BatchRepository
+
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    session_factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    async with session_factory() as session:
+        repo = BatchRepository(session)
+        batch = await repo.update_file_count(batch_id, BatchCreate(file_count=file_count))
         await session.commit()
         batch_id = batch.id
     await engine.dispose()
@@ -76,6 +95,7 @@ def main() -> None:
 
     current_batch_id: int | None = None
     last_file_time: float = 0.0
+    
 
     for remote_path in watcher.watch():
         request_id = str(uuid.uuid4())
@@ -86,9 +106,14 @@ def main() -> None:
             # Start a new batch if none exists or the window has expired
             if current_batch_id is None or (now - last_file_time) > BATCH_WINDOW_SECONDS:
                 current_batch_id = asyncio.run(_create_batch())
+                count: int = 0
                 logger.info("new batch created", extra={"batch_id": current_batch_id})
+                
             last_file_time = now
-
+            
+            count += 1
+            
+            update_file_count = asyncio.run(_update_batch_file_count(current_batch_id, count))
             local_path = _download_from_sftp(remote_path)
             blob_path = _upload_to_minio(local_path, filename)
             enqueue_inference_job(
